@@ -17,6 +17,7 @@ import requests
 # ==========================================
 
 # 1. API 키 설정
+# 비트겟_API_KEY
 BITGET_API = {
     'apiKey': '',
     'secret': '',
@@ -25,6 +26,7 @@ BITGET_API = {
     'options': {'defaultType': 'spot'} # 기본 현물 설정
 }
 
+# 업비트_API_KEY
 UPBIT_ACCESS = ""
 UPBIT_SECRET = ""
 
