@@ -33,8 +33,14 @@ UPBIT_SECRET = ""
 # 2. 지갑 주소 설정 (오입력 시 자산 증발 주의)
 # 비트겟 USDT 주소 (TRC20 필수)
 BITGET_USDT_ADDRESS = ""
+
+# 업비트 코인(심볼) 주소
 UPBIT_SOL_ADDRESS = "" 
+
+# 업비트 코인(심볼) 종류
 SYMBOL_NAME = 'SOL'
+
+# 주문 수량
 QTY = 0.11
 
 # ==========================================
