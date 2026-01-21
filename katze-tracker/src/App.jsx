@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 // --- 1. 아이콘 및 데이터 상수 (변경 없음) ---
 const ICONS = {
@@ -8,6 +8,7 @@ const ICONS = {
   calculator: <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V18zm2.498-6.75h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V13.5zm0 2.25h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V18zm2.504-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zm0 2.25h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V18zm2.498-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zM8.25 6h7.5v2.25h-7.5V6zM12 2.25c-1.892 0-3.758.11-5.593.322C5.307 2.7 4.5 3.65 4.5 4.757V19.5a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25V4.757c0-1.108-.806-2.057-1.907-2.185A48.507 48.507 0 0012 2.25z" />,
   chart: <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />,
   bell: <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />,
+  community: <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.75-7.5A9.094 9.094 0 0018 3.75m-4.5 14.97a9.11 9.11 0 01-9 0m9 0a9.1 9.1 0 003.75-7.5 9.094 9.094 0 00-3.75-7.5m-9 15a9.1 9.1 0 01-3.75-7.5 9.094 9.094 0 013.75-7.5m9 15v-3.75a3.75 3.75 0 00-3.75-3.75H9a3.75 3.75 0 00-3.75 3.75V18.75m9 0H9m4.5-12a3 3 0 11-6 0 3 3 0 016 0zm7.5 2.25a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />,
   heatmap: <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
 };
 
@@ -18,18 +19,117 @@ const MENU_ITEMS = [
   { id: "calculator", label: "Calculator", icon: "calculator" },
   { id: "heatmap", label: "Heatmap", icon: "heatmap" },
   { id: "analytics", label: "Analytics", icon: "chart" },
-  { id: "alerts", label: "Alerts", icon: "bell" }
+  { id: "alerts", label: "Alerts", icon: "bell" },
+  { id: "community", label: "Community", icon: "community" }
 ];
 
 const EXCHANGES = {
-  Variational: { code: "VA", colors: { bg: "rgba(106, 169, 255, 0.12)", primary: "#6AA9FF", border: "rgba(106, 169, 255, 0.2)" } },
-  Pacifica: { code: "PC", colors: { bg: "rgba(59, 130, 246, 0.12)", primary: "#3B82F6", border: "rgba(59, 130, 246, 0.2)" } },
-  Lighter: { code: "LT", colors: { bg: "rgba(148, 163, 184, 0.12)", primary: "#94a3b8", border: "rgba(148, 163, 184, 0.2)" } },
-  Grvt: { code: "GV", colors: { bg: "rgba(182, 232, 112, 0.12)", primary: "#B6E870", border: "rgba(182, 232, 112, 0.2)" } },
-  Paradex: { code: "PX", colors: { bg: "rgba(124, 61, 184, 0.12)", primary: "#7C3DB8", border: "rgba(124, 61, 184, 0.2)" } },
-  Hyperliquid: { code: "HL", colors: { bg: "rgba(118, 207, 193, 0.12)", primary: "#76CFC1", border: "rgba(118, 207, 193, 0.2)" } },
-  Backpack: { code: "BP", colors: { bg: "rgba(239, 68, 68, 0.12)", primary: "#EF4444", border: "rgba(239, 68, 68, 0.2)" } },
+  Bitget: { code: "BG", colors: { bg: "rgba(14, 165, 233, 0.12)", primary: "#0EA5E9", border: "rgba(14, 165, 233, 0.2)" } },
+  Upbit: { code: "UB", colors: { bg: "rgba(37, 99, 235, 0.12)", primary: "#2563EB", border: "rgba(37, 99, 235, 0.2)" } },
 };
+
+const COINS = ["SOL", "TRX", "ARB", "USDT", "USDC", "XPL", "DOT", "XRP", "SUI"];
+const UPBIT_BASE_URL = "https://api.upbit.com/v1";
+const BITGET_BASE_URL = "https://api.bitget.com";
+const REFRESH_MS = 10000;
+
+const toNumber = (value) => {
+  const num = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(num) ? num : null;
+};
+
+const formatPrice = (value) => {
+  if (!Number.isFinite(value)) return "N/A";
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+};
+
+const formatGap = (value) => {
+  if (!Number.isFinite(value)) return "N/A";
+  return `${value.toFixed(2)}%`;
+};
+
+async function fetchUpbitMarketSet() {
+  const response = await fetch(`${UPBIT_BASE_URL}/market/all?isDetails=false`);
+  if (!response.ok) throw new Error("Upbit market list error");
+  const data = await response.json();
+  return new Set(data.map((item) => item.market));
+}
+
+async function fetchUpbitTickers(markets) {
+  if (markets.length === 0) return new Map();
+  const response = await fetch(`${UPBIT_BASE_URL}/ticker?markets=${markets.join(",")}`);
+  if (!response.ok) throw new Error("Upbit ticker error");
+  const data = await response.json();
+  const map = new Map();
+  data.forEach((item) => {
+    map.set(item.market, toNumber(item.trade_price));
+  });
+  return map;
+}
+
+function extractBitgetPrice(data) {
+  if (!data) return null;
+  const candidates = [data.last, data.close, data.price, data.lastPr, data.lastPrice];
+  for (const value of candidates) {
+    const parsed = toNumber(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+function extractBitgetPair(data) {
+  if (!data) return null;
+  if (data.baseCoin && data.quoteCoin) {
+    return { base: data.baseCoin, quote: data.quoteCoin };
+  }
+  const symbolName = data.symbolName || data.symbol;
+  if (!symbolName) return null;
+  const cleaned = symbolName.replace(/_SPBL$/i, "").replace("/", "");
+  if (cleaned.endsWith("USDT")) {
+    return { base: cleaned.slice(0, -4), quote: "USDT" };
+  }
+  return null;
+}
+
+async function fetchBitgetTickers(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Bitget tickers error (${response.status})`);
+  const payload = await response.json();
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+async function fetchBitgetPrices(coins) {
+  const endpoints = [
+    `${BITGET_BASE_URL}/api/v2/spot/market/tickers`,
+    `${BITGET_BASE_URL}/api/spot/v1/market/tickers`,
+  ];
+  let data = null;
+  let lastError = null;
+
+  for (const url of endpoints) {
+    try {
+      data = await fetchBitgetTickers(url);
+      break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (!data) throw lastError || new Error("Bitget tickers error");
+
+  const coinSet = new Set(coins);
+  const map = new Map();
+
+  data.forEach((item) => {
+    const pair = extractBitgetPair(item);
+    if (!pair || pair.quote !== "USDT") return;
+    if (!coinSet.has(pair.base)) return;
+    const price = extractBitgetPrice(item);
+    if (price !== null) map.set(pair.base, price);
+  });
+
+  return map;
+}
 
 const SvgIcon = ({ name, className }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -58,7 +158,7 @@ const SidebarContent = ({ activeNav, setActiveNav, isDark, setIsDark, setMobileM
             <img src="/logo.jpg" alt="K" className="w-full h-full object-cover opacity-80" onError={(e) => {e.target.style.display='none'; e.target.parentElement.innerText='K'}}/>
         </div>
         <div className="lg:block md:hidden overflow-hidden whitespace-nowrap">
-          <h1 className="text-text-primary font-semibold text-[15px]">Katze Tracker</h1>
+          <h1 className="text-text-primary font-semibold text-[15px]">MATGA</h1>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-accent shadow-[0_0_8px_var(--color-accent)]"></span>
             <span className="text-accent text-xs font-medium">Online</span>
@@ -103,6 +203,8 @@ export default function App() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const hasLoadedRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -112,18 +214,96 @@ export default function App() {
 
   // 데이터 시뮬레이션 (대시보드용 가짜 데이터)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const mockData = [
-        { id: 1, ticker: "BTC-PERP", exchangeA: "Hyperliquid", exchangeB: "Paradex", priceA: 96500.50, priceB: 96850.00, gap: 0.36, strategy: { long: "Hyperliquid", short: "Paradex" } },
-        { id: 2, ticker: "ETH-PERP", exchangeA: "Variational", exchangeB: "Grvt", priceA: 2850.10, priceB: 2845.00, gap: 0.18, strategy: { long: "Grvt", short: "Variational" } },
-        { id: 3, ticker: "SOL-PERP", exchangeA: "Pacifica", exchangeB: "Hyperliquid", priceA: 145.20, priceB: 146.50, gap: 0.90, strategy: { long: "Pacifica", short: "Hyperliquid" } },
-        { id: 4, ticker: "WIF-PERP", exchangeA: "Backpack", exchangeB: "Paradex", priceA: 2.50, priceB: 2.55, gap: 2.00, strategy: { long: "Backpack", short: "Paradex" } },
-        { id: 5, ticker: "DOGE-PERP", exchangeA: "Lighter", exchangeB: "Hyperliquid", priceA: 0.1250, priceB: 0.1255, gap: 0.40, strategy: { long: "Lighter", short: "Hyperliquid" } },
-      ];
-      setData(mockData);
-      setLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+
+    const loadData = async () => {
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
+      if (!hasLoadedRef.current) setLoading(true);
+
+      try {
+        const bitgetPromise = fetchBitgetPrices(COINS);
+
+        const upbitMarketSet = await fetchUpbitMarketSet();
+        const upbitMarkets = COINS.map((coin) => `KRW-${coin}`).filter((market) => upbitMarketSet.has(market));
+        if (!upbitMarkets.includes("KRW-USDT") && upbitMarketSet.has("KRW-USDT")) {
+          upbitMarkets.push("KRW-USDT");
+        }
+        const upbitTickers = await fetchUpbitTickers(upbitMarkets);
+        const bitgetPrices = await bitgetPromise;
+
+        const krwPerUsdt = upbitTickers.get("KRW-USDT");
+        const rows = COINS.map((coin, index) => {
+          const bitgetPrice = coin === "USDT" ? 1 : bitgetPrices.get(coin) ?? null;
+          const upbitKrw = upbitTickers.get(`KRW-${coin}`) ?? null;
+          const upbitPrice = krwPerUsdt && Number.isFinite(upbitKrw) ? upbitKrw / krwPerUsdt : null;
+
+          const hasPrices = Number.isFinite(bitgetPrice) && Number.isFinite(upbitPrice) && bitgetPrice > 0 && upbitPrice > 0;
+          let priceA = null;
+          let priceB = null;
+          let exchangeA = null;
+          let exchangeB = null;
+          let gap = null;
+          let strategy = null;
+
+          if (hasPrices) {
+            if (bitgetPrice <= upbitPrice) {
+              priceA = bitgetPrice;
+              priceB = upbitPrice;
+              exchangeA = "Bitget";
+              exchangeB = "Upbit";
+            } else {
+              priceA = upbitPrice;
+              priceB = bitgetPrice;
+              exchangeA = "Upbit";
+              exchangeB = "Bitget";
+            }
+
+            gap = ((priceB - priceA) / priceA) * 100;
+            strategy = { long: exchangeA, short: exchangeB };
+          }
+
+          return {
+            id: coin,
+            ticker: `${coin}-USDT`,
+            exchangeA,
+            exchangeB,
+            priceA,
+            priceB,
+            gap,
+            strategy,
+            sortIndex: index,
+          };
+        });
+
+        if (!cancelled) {
+          const sortedRows = [...rows].sort((a, b) => {
+            const gapA = Number.isFinite(a.gap) ? a.gap : -1;
+            const gapB = Number.isFinite(b.gap) ? b.gap : -1;
+            if (gapA === gapB) return a.sortIndex - b.sortIndex;
+            return gapB - gapA;
+          });
+          setData(sortedRows);
+          setLoading(false);
+          hasLoadedRef.current = true;
+        }
+      } catch (error) {
+        console.error("Failed to load prices:", error);
+        if (!cancelled) {
+          setLoading(false);
+          hasLoadedRef.current = true;
+        }
+      } finally {
+        isFetchingRef.current = false;
+      }
+    };
+
+    loadData();
+    const interval = setInterval(loadData, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -161,7 +341,7 @@ export default function App() {
             <button onClick={() => setIsMobileMenuOpen(true)} className="p-1 text-text-secondary hover:bg-bg-hover rounded">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
-            <span className="font-semibold">Katze Tracker</span>
+            <span className="font-semibold">MATGA</span>
           </div>
           <button onClick={() => setIsDark(!isDark)} className="p-2">{isDark ? '🌙' : '☀️'}</button>
         </header>
@@ -204,46 +384,64 @@ export default function App() {
                         <thead className="bg-bg-secondary/95 sticky top-0 z-10 backdrop-blur-sm shadow-sm">
                             <tr className="border-b border-border text-[10px] text-text-muted uppercase tracking-wider font-semibold">
                                 <th className="w-10 px-2 py-3 text-center">#</th>
-                                <th className="px-5 py-3">Ticker</th>
-                                <th className="px-5 py-3">Exchanges</th>
-                                <th className="px-5 py-3 text-right hidden md:table-cell">Price A</th>
-                                <th className="px-5 py-3 text-right hidden md:table-cell">Price B</th>
-                                <th className="px-5 py-3 text-right">Gap</th>
-                                <th className="px-5 py-3 hidden xl:table-cell">Strategy</th>
+                                <th className="px-5 py-3 text-center">Ticker</th>
+                                <th className="px-5 py-3 text-center">Exchanges</th>
+                                <th className="px-5 py-3 text-center">Price A</th>
+                                <th className="px-5 py-3 text-center">Price B</th>
+                                <th className="px-5 py-3 text-center">Gap</th>
+                                <th className="px-5 py-3 text-center hidden xl:table-cell">Strategy</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                             {data.map((item, idx) => (
                                 <tr key={item.id} className="group hover:bg-bg-hover transition-colors cursor-pointer">
                                     <td className="px-2 py-3 text-center text-text-muted text-xs">{idx + 1}</td>
-                                    <td className="px-5 py-3 font-medium text-[13px] text-text-primary">{item.ticker}</td>
-                                    <td className="px-5 py-3">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                    <td className="px-5 py-3 font-medium text-[13px] text-text-primary text-center">{item.ticker}</td>
+                                    <td className="px-5 py-3 text-center">
+                                        {item.exchangeA && item.exchangeB ? (
+                                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                             <ExchangeBadge name={item.exchangeA} size="sm" />
-                                            <span className="text-text-muted text-[10px]">↔</span>
+                                            <span className="text-text-muted text-[10px]">&harr;</span>
                                             <ExchangeBadge name={item.exchangeB} size="sm" />
+                                          </div>
+                                        ) : (
+                                          <span className="text-[10px] bg-bg-tertiary border border-border px-2 py-1 rounded text-text-muted whitespace-nowrap">
+                                            N/A
+                                          </span>
+                                        )}
+                                    </td>
+                                    <td className={`px-5 py-3 text-center font-mono text-[13px] ${Number.isFinite(item.priceA) ? 'text-text-primary/90' : 'text-text-muted'}`}>
+                                        {formatPrice(item.priceA)}
+                                    </td>
+                                    <td className={`px-5 py-3 text-center font-mono text-[13px] ${Number.isFinite(item.priceB) ? 'text-text-primary/90' : 'text-text-muted'}`}>
+                                        {formatPrice(item.priceB)}
+                                    </td>
+                                    <td className="px-5 py-3 text-center">
+                                        <div className={`inline-flex items-center px-2 py-1 rounded-md font-mono text-xs font-semibold ${Number.isFinite(item.gap) ? (item.gap > 0.5 ? 'bg-accent-muted text-accent border border-accent/20' : 'bg-bg-tertiary text-text-secondary border border-border') : 'bg-bg-tertiary text-text-muted border border-border'}`}>
+                                            {formatGap(item.gap)}
                                         </div>
                                     </td>
-                                    <td className="px-5 py-3 text-right font-mono text-[13px] text-text-primary/90 hidden md:table-cell">
-                                        ${item.priceA.toLocaleString(undefined, {minimumFractionDigits: 2})}
-                                    </td>
-                                    <td className="px-5 py-3 text-right font-mono text-[13px] text-text-primary/90 hidden md:table-cell">
-                                        ${item.priceB.toLocaleString(undefined, {minimumFractionDigits: 2})}
-                                    </td>
-                                    <td className="px-5 py-3 text-right">
-                                        <div className={`inline-flex items-center px-2 py-1 rounded-md font-mono text-xs font-semibold ${item.gap > 0.5 ? 'bg-accent-muted text-accent border border-accent/20' : 'bg-bg-tertiary text-text-secondary border border-border'}`}>
-                                            {item.gap.toFixed(2)}%
-                                        </div>
-                                    </td>
-                                    <td className="px-5 py-3 hidden xl:table-cell">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] bg-bg-tertiary border border-border px-2 py-1 rounded text-text-secondary whitespace-nowrap">
-                                                Long {item.strategy.long}
-                                            </span>
-                                            <span className="text-[10px] bg-bg-tertiary border border-border px-2 py-1 rounded text-text-secondary whitespace-nowrap">
-                                                Short {item.strategy.short}
-                                            </span>
-                                        </div>
+                                    <td className="px-5 py-3 text-center hidden xl:table-cell">
+                                        {item.strategy ? (
+                                          <div className="flex items-center justify-center gap-2">
+                                              <div className="flex items-center gap-1.5">
+                                                  <span className="text-[10px] text-[var(--color-positive)] font-semibold whitespace-nowrap">
+                                                    Long
+                                                  </span>
+                                                  <ExchangeBadge name={item.strategy.long} size="sm" />
+                                              </div>
+                                              <div className="flex items-center gap-1.5">
+                                                  <span className="text-[10px] text-[var(--color-negative)] font-semibold whitespace-nowrap">
+                                                    Short
+                                                  </span>
+                                                  <ExchangeBadge name={item.strategy.short} size="sm" />
+                                              </div>
+                                          </div>
+                                        ) : (
+                                          <span className="text-[10px] bg-bg-tertiary border border-border px-2 py-1 rounded text-text-muted whitespace-nowrap">
+                                            N/A
+                                          </span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
