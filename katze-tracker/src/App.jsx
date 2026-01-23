@@ -290,6 +290,15 @@ export default function App() {
   const [botActionLoading, setBotActionLoading] = useState(false);
   const [tradeLogs, setTradeLogs] = useState([]);
   const [logConnection, setLogConnection] = useState("disconnected");
+  const [analysisForm, setAnalysisForm] = useState({
+    departure: "UPBIT",
+    destination: "BITGET",
+    coin: "USDT",
+    chain: "TRC20",
+  });
+  const [analysisResult, setAnalysisResult] = useState("");
+  const [analysisError, setAnalysisError] = useState("");
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const hasSeededLogsRef = useRef(false);
   const logContainerRef = useRef(null);
   const autoScrollEnabledRef = useRef(true);
@@ -302,6 +311,47 @@ export default function App() {
 
   const toggleMask = (field) => {
     setMaskedFields((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  const updateAnalysisForm = (field) => (event) => {
+    const { value } = event.target;
+    setAnalysisForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleChainAnalysis = async () => {
+    setAnalysisError("");
+    setAnalysisResult("");
+
+    const payload = {
+      departure: analysisForm.departure.trim(),
+      destination: analysisForm.destination.trim(),
+      coin: analysisForm.coin.trim(),
+      chain: analysisForm.chain.trim(),
+    };
+
+    if (!payload.departure || !payload.destination || !payload.coin || !payload.chain) {
+      setAnalysisError("All fields are required.");
+      return;
+    }
+
+    setAnalysisLoading(true);
+    try {
+      const response = await fetch(`${LOCAL_API_BASE}/chain-analysis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        setAnalysisError(result.msg || "Chain analysis failed.");
+        return;
+      }
+      setAnalysisResult(result.result || "");
+    } catch (error) {
+      setAnalysisError("Failed to connect to local agent.");
+    } finally {
+      setAnalysisLoading(false);
+    }
   };
 
   const clearScrollIdleTimer = () => {
@@ -444,6 +494,12 @@ export default function App() {
 
   const startDisabled = botActionLoading || botStatus.running || !botStatus.connected;
   const stopDisabled = botActionLoading || !botStatus.running || !botStatus.connected;
+  const analysisDisabled = analysisLoading
+    || !botStatus.connected
+    || !analysisForm.departure.trim()
+    || !analysisForm.destination.trim()
+    || !analysisForm.coin.trim()
+    || !analysisForm.chain.trim();
   const progressTotal = botStatus.currentStepTotal || 8;
   const progressCurrent = Math.min(botStatus.currentStep || 0, progressTotal);
   const progressRatio = progressTotal ? (progressCurrent / progressTotal) * 100 : 0;
@@ -788,28 +844,100 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="bg-bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col flex-1 min-h-0 min-w-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="font-semibold text-sm text-text-primary">Trade Logs</h2>
-                        <p className="text-[10px] text-text-muted mt-0.5">매매 관련 로그만 표시됩니다.</p>
+                                <div className="bg-bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col flex-1 min-h-0 min-w-0">
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 flex-1 min-h-0">
+                    <div className="flex flex-col min-h-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h2 className="font-semibold text-sm text-text-primary">Trade Logs</h2>
+                          <p className="text-[10px] text-text-muted mt-0.5">매매 관련 로그</p>
+                        </div>
+                        <span className="text-[10px] text-text-muted">{tradeLogs.length} lines</span>
                       </div>
-                      <span className="text-[10px] text-text-muted">{tradeLogs.length} lines</span>
+                      <div
+                        ref={logContainerRef}
+                        onScroll={handleLogScroll}
+                        className="mt-3 flex-1 overflow-auto rounded-lg border border-border bg-bg-tertiary p-3 font-mono text-[11px] text-text-secondary"
+                      >
+                        {tradeLogs.length ? (
+                          tradeLogs.map((line, idx) => (
+                            <div key={`${idx}-${line.slice(0, 12)}`} className="break-all">{line}</div>
+                          ))
+                        ) : (
+                          <div className="text-text-muted">?? ?? ??? ????.</div>
+                        )}
+                      </div>
                     </div>
-                    <div
-                      ref={logContainerRef}
-                      onScroll={handleLogScroll}
-                      className="mt-3 flex-1 overflow-auto rounded-lg border border-border bg-bg-tertiary p-3 font-mono text-[11px] text-text-secondary"
-                    >
-                      {tradeLogs.length ? (
-                        tradeLogs.map((line, idx) => (
-                          <div key={`${idx}-${line.slice(0, 12)}`} className="break-all">{line}</div>
-                        ))
-                      ) : (
-                        <div className="text-text-muted">아직 매매 로그가 없습니다.</div>
-                      )}
+                    <div className="flex flex-col min-h-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h2 className="font-semibold text-sm text-text-primary">Chain Speed Analysis</h2>
+                          <p className="text-[10px] text-text-muted mt-0.5">OpenAI estimate of transfer time</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-col gap-3 text-xs flex-1 min-h-0">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] text-text-muted">Departure</span>
+                            <input
+                              type="text"
+                              value={analysisForm.departure}
+                              onChange={updateAnalysisForm("departure")}
+                              className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                              placeholder="UPBIT"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] text-text-muted">Destination</span>
+                            <input
+                              type="text"
+                              value={analysisForm.destination}
+                              onChange={updateAnalysisForm("destination")}
+                              className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                              placeholder="BITGET"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] text-text-muted">Coin</span>
+                            <input
+                              type="text"
+                              value={analysisForm.coin}
+                              onChange={updateAnalysisForm("coin")}
+                              className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                              placeholder="USDT"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] text-text-muted">Chain</span>
+                            <input
+                              type="text"
+                              value={analysisForm.chain}
+                              onChange={updateAnalysisForm("chain")}
+                              className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                              placeholder="TRC20"
+                            />
+                          </label>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleChainAnalysis}
+                          disabled={analysisDisabled}
+                          className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all ${analysisDisabled ? "bg-bg-tertiary text-text-muted border border-border" : "bg-accent text-white hover:brightness-125"}`}
+                        >
+                          {analysisLoading ? "Analyzing..." : "Execute"}
+                        </button>
+                        {analysisError && (
+                          <div className="text-[11px] text-negative">{analysisError}</div>
+                        )}
+                        <div className="flex-1 rounded-lg border border-border bg-bg-tertiary p-3 text-[11px] text-text-secondary font-mono overflow-auto">
+                          {analysisLoading
+                            ? "Analyzing..."
+                            : analysisResult || "No analysis yet."}
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </div>
                 </div>
 
                 <div className="flex flex-col gap-4 lg:col-span-1 min-h-0">

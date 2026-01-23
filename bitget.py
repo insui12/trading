@@ -50,7 +50,7 @@ if not os.path.exists('./log'):
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%y-%m-%d %H:%M:%S')
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)

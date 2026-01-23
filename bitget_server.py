@@ -108,7 +108,7 @@ class DailyFileHandler(logging.Handler):
 LOG_DIR = os.path.join(os.path.dirname(__file__), "log")
 os.makedirs(LOG_DIR, exist_ok=True)
 
-formatter = logging.Formatter('%(asctime)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(message)s', datefmt='%y-%m-%d %H:%M:%S')
 
 logger = logging.getLogger("bot")
 logger.setLevel(logging.INFO)
@@ -165,6 +165,12 @@ class BotConfig(BaseModel):
     SYMBOL_NETWORK: str = 'SOL'
     QTY: float = 0.11
 
+class ChainAnalysisRequest(BaseModel):
+    departure: str
+    destination: str
+    coin: str
+    chain: str
+
 NETWORK_ALIASES = {
     "TRC20": {"TRC20", "TRX", "TRON"},
     "TRX": {"TRC20", "TRX", "TRON"},
@@ -197,6 +203,32 @@ UPBIT_NET_TYPE_MAP = {
     "BEP20": "BSC",
     "BSC": "BSC",
 }
+
+ENV_LOADED = False
+
+def load_env_file():
+    global ENV_LOADED
+    if ENV_LOADED:
+        return
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    if not os.path.exists(env_path):
+        ENV_LOADED = True
+        return
+    try:
+        with open(env_path, "r", encoding="utf-8") as handle:
+            for raw_line in handle:
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip("\"").strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    finally:
+        ENV_LOADED = True
 
 def normalize_network(value):
     if not value:
@@ -641,6 +673,48 @@ def get_status():
         "current_step_label": BOT_STATE["current_step_label"],
         "current_step_total": BOT_STATE["current_step_total"]
     }
+
+@app.post("/chain-analysis")
+def chain_analysis(request: ChainAnalysisRequest):
+    load_env_file()
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return {"success": False, "msg": "OPENAI_API_KEY is not set."}
+
+    try:
+        from openai import OpenAI
+    except Exception:
+        return {"success": False, "msg": "OpenAI SDK is not installed."}
+
+    departure = (request.departure or "").strip().upper()
+    destination = (request.destination or "").strip().upper()
+    coin = (request.coin or "").strip().upper()
+    chain = (request.chain or "").strip().upper()
+
+    if not departure or not destination or not coin or not chain:
+        return {"success": False, "msg": "All fields are required."}
+
+    prompt = (
+        "?? ??? ?? ?? ??? ???. "
+        "??? ??? ? ????? ???: "
+        "[???1 -> ???2, ???/???, ? 00~00?]\n"
+        f"??: {departure} -> {destination}, {coin}/{chain}"
+    )
+
+    try:
+        client = OpenAI(api_key=api_key)
+        response = client.responses.create(
+            model="gpt-4o-mini",
+            input=prompt,
+            store=False,
+        )
+        result = (getattr(response, "output_text", "") or "").strip()
+        if not result:
+            return {"success": False, "msg": "Empty response from model."}
+        return {"success": True, "result": result}
+    except Exception as e:
+        trade_logger.error(f"Chain analysis error: {e}")
+        return {"success": False, "msg": f"Chain analysis failed: {e}"}
 
 @app.websocket("/ws/logs")
 async def stream_logs(websocket: WebSocket):
