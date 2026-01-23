@@ -700,40 +700,41 @@ export default function App() {
                 </div>
 
                 <div className="flex flex-col gap-4 lg:col-span-1 min-h-0">
-                  <div className="bg-bg-card border border-border rounded-2xl p-4 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h2 className="font-semibold text-sm text-text-primary">Auto Trading Control</h2>
-                          <p className="text-[10px] text-text-muted mt-0.5">Local agent: 127.0.0.1:8000</p>
-                        </div>
-                        <span className={`text-[10px] px-2 py-1 rounded-md border ${botStatus.connected ? 'bg-accent-muted text-accent border-[var(--color-accent)]' : 'bg-bg-tertiary text-text-muted border-border'}`}>
-                          {botStatus.connected ? 'Connected' : 'Offline'}
+                  <div className="bg-bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col flex-1 min-h-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="font-semibold text-sm text-text-primary">Auto Trading Control</h2>
+                        <p className="text-[10px] text-text-muted mt-0.5">Local agent: 127.0.0.1:8000</p>
+                      </div>
+                      <span className={`text-[10px] px-2 py-1 rounded-md border ${botStatus.connected ? 'bg-accent-muted text-accent border-[var(--color-accent)]' : 'bg-bg-tertiary text-text-muted border-border'}`}>
+                        {botStatus.connected ? 'Connected' : 'Offline'}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 rounded-xl border border-border bg-bg-tertiary/40 p-3">
+                      <div className="flex items-center justify-between text-[10px] text-text-muted">
+                        <span>진행 단계</span>
+                        <span>{progressCurrent}/{progressTotal}</span>
+                      </div>
+                      <div className="mt-2 h-2 rounded-full bg-bg-tertiary border border-border overflow-hidden">
+                        <div className="h-full bg-accent transition-all duration-300" style={{ width: `${progressRatio}%` }}></div>
+                      </div>
+                      <div className="mt-2">
+                        <span
+                          className="inline-flex items-center rounded-md border px-2 py-1 text-[10px] font-semibold"
+                          style={{
+                            color: `rgb(${stepColor})`,
+                            borderColor: `rgba(${stepColor}, 0.35)`,
+                            backgroundColor: `rgba(${stepColor}, 0.15)`,
+                          }}
+                        >
+                          {`Step ${progressCurrent}/${progressTotal} ${stepLabel}`}
                         </span>
                       </div>
+                    </div>
 
-                      <div className="mt-3 rounded-xl border border-border bg-bg-tertiary/40 p-3">
-                        <div className="flex items-center justify-between text-[10px] text-text-muted">
-                          <span>진행 단계</span>
-                          <span>{progressCurrent}/{progressTotal}</span>
-                        </div>
-                        <div className="mt-2 h-2 rounded-full bg-bg-tertiary border border-border overflow-hidden">
-                          <div className="h-full bg-accent transition-all duration-300" style={{ width: `${progressRatio}%` }}></div>
-                        </div>
-                        <div className="mt-2">
-                          <span
-                            className="inline-flex items-center rounded-md border px-2 py-1 text-[10px] font-semibold"
-                            style={{
-                              color: `rgb(${stepColor})`,
-                              borderColor: `rgba(${stepColor}, 0.35)`,
-                              backgroundColor: `rgba(${stepColor}, 0.15)`,
-                            }}
-                          >
-                            {`Step ${progressCurrent}/${progressTotal} ${stepLabel}`}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex flex-col gap-3 text-xs">
+                    <div className="mt-3 flex-1 overflow-auto pr-1">
+                      <div className="flex flex-col gap-3 text-xs">
                         <label className="flex flex-col gap-1">
                           <span className="text-[10px] text-text-muted">Bitget API Key</span>
                           <input
@@ -827,47 +828,33 @@ export default function App() {
                           />
                         </label>
                       </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={handleStart}
-                          disabled={startDisabled}
-                          className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all ${startDisabled ? 'bg-bg-tertiary text-text-muted border border-border' : 'bg-accent text-white hover:brightness-125'}`}
-                        >
-                          {botActionLoading && !botStatus.running ? 'Starting...' : 'Start'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleStop}
-                          disabled={stopDisabled}
-                          className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all ${stopDisabled ? 'bg-bg-tertiary text-text-muted border border-border' : 'bg-[var(--color-negative)] text-white hover:brightness-125'}`}
-                        >
-                          {botActionLoading && botStatus.running ? 'Stopping...' : 'Stop'}
-                        </button>
-                      </div>
-
-                      <div className="mt-3 flex flex-col gap-1">
-                        <div className="flex items-center gap-2 text-[10px] text-text-muted">
-                          <span className={`status-dot ${botStatus.running ? 'status-dot-online' : 'status-dot-offline'}`}></span>
-                          <span>{botStatus.running ? 'Running' : 'Stopped'}</span>
-                          <span className="ml-auto">{botStatus.msg}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-text-muted">
-                          <span className={`status-dot ${logConnection === 'connected' ? 'status-dot-online' : logConnection === 'connecting' ? 'status-dot-warning' : 'status-dot-offline'}`}></span>
-                          <span>Log Stream</span>
-                          <span className="ml-auto">
-                            {logConnection === 'connected' ? 'Live' : logConnection === 'connecting' ? 'Connecting' : 'Offline'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {botError && (
-                        <div className="mt-3 text-[11px] text-negative">
-                          {botError}
-                        </div>
-                      )}
                     </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={handleStart}
+                        disabled={startDisabled}
+                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all ${startDisabled ? 'bg-bg-tertiary text-text-muted border border-border' : 'bg-accent text-white hover:brightness-125'}`}
+                      >
+                        {botActionLoading && !botStatus.running ? 'Starting...' : 'Start'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleStop}
+                        disabled={stopDisabled}
+                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all ${stopDisabled ? 'bg-bg-tertiary text-text-muted border border-border' : 'bg-[var(--color-negative)] text-white hover:brightness-125'}`}
+                      >
+                        {botActionLoading && botStatus.running ? 'Stopping...' : 'Stop'}
+                      </button>
+                    </div>
+
+                    {botError && (
+                      <div className="mt-3 text-[11px] text-negative">
+                        {botError}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
