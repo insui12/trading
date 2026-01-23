@@ -62,6 +62,8 @@ const REFRESH_MS = 10000;
 const LOCAL_API_BASE = "http://127.0.0.1:8000";
 const LOCAL_WS_URL = "ws://127.0.0.1:8000/ws/logs";
 const LOG_LIMIT = 200;
+const LOG_AUTO_SCROLL_IDLE_MS = 5000;
+const LOG_AUTO_SCROLL_THRESHOLD_PX = 12;
 const STEP_META = {
   1: { label: "매수", color: "34,197,94" },
   2: { label: "헷징", color: "239,68,68" },
@@ -284,6 +286,9 @@ export default function App() {
   const [tradeLogs, setTradeLogs] = useState([]);
   const [logConnection, setLogConnection] = useState("disconnected");
   const hasSeededLogsRef = useRef(false);
+  const logContainerRef = useRef(null);
+  const autoScrollEnabledRef = useRef(true);
+  const scrollIdleTimerRef = useRef(null);
 
   const updateBotForm = (field) => (event) => {
     const { value } = event.target;
@@ -292,6 +297,40 @@ export default function App() {
 
   const toggleMask = (field) => {
     setMaskedFields((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  const clearScrollIdleTimer = () => {
+    if (scrollIdleTimerRef.current) {
+      clearTimeout(scrollIdleTimerRef.current);
+      scrollIdleTimerRef.current = null;
+    }
+  };
+
+  const scrollLogsToBottom = () => {
+    const container = logContainerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+  };
+
+  const scheduleAutoScrollResume = () => {
+    clearScrollIdleTimer();
+    scrollIdleTimerRef.current = setTimeout(() => {
+      autoScrollEnabledRef.current = true;
+      scrollLogsToBottom();
+    }, LOG_AUTO_SCROLL_IDLE_MS);
+  };
+
+  const handleLogScroll = () => {
+    const container = logContainerRef.current;
+    if (!container) return;
+    const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isAtBottom = distanceToBottom <= LOG_AUTO_SCROLL_THRESHOLD_PX;
+    autoScrollEnabledRef.current = isAtBottom;
+    if (isAtBottom) {
+      clearScrollIdleTimer();
+      return;
+    }
+    scheduleAutoScrollResume();
   };
 
   useEffect(() => {
@@ -587,6 +626,17 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      clearScrollIdleTimer();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!autoScrollEnabledRef.current) return;
+    scrollLogsToBottom();
+  }, [tradeLogs]);
+
   return (
     // ✅ [핵심 수정] Flexbox 레이아웃 적용: 전체 화면을 가로로 나열하여 겹침 방지
     <div className="flex h-screen bg-bg-primary text-text-primary font-sans transition-colors duration-300 overflow-hidden">
@@ -741,7 +791,11 @@ export default function App() {
                       </div>
                       <span className="text-[10px] text-text-muted">{tradeLogs.length} lines</span>
                     </div>
-                    <div className="mt-3 flex-1 overflow-auto rounded-lg border border-border bg-bg-tertiary p-3 font-mono text-[11px] text-text-secondary">
+                    <div
+                      ref={logContainerRef}
+                      onScroll={handleLogScroll}
+                      className="mt-3 flex-1 overflow-auto rounded-lg border border-border bg-bg-tertiary p-3 font-mono text-[11px] text-text-secondary"
+                    >
                       {tradeLogs.length ? (
                         tradeLogs.map((line, idx) => (
                           <div key={`${idx}-${line.slice(0, 12)}`} className="break-all">{line}</div>
