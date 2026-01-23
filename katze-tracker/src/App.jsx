@@ -30,6 +30,32 @@ const EXCHANGES = {
 };
 
 const COINS = ["SOL", "TRX", "ARB", "USDT", "USDC", "XPL", "DOT", "XRP", "SUI"];
+const NETWORK_OPTIONS = [
+  { value: "TRC20", label: "TRC20 (Tron)" },
+  { value: "ERC20", label: "ERC20 (Ethereum)" },
+  { value: "BEP20", label: "BEP20 (BSC)" },
+  { value: "SOL", label: "SOL (Solana)" },
+  { value: "ARB", label: "ARB (Arbitrum)" },
+  { value: "OP", label: "OP (Optimism)" },
+  { value: "MATIC", label: "MATIC (Polygon)" },
+  { value: "AVAXC", label: "AVAX-C (Avalanche C-Chain)" },
+  { value: "XRP", label: "XRP (XRPL)" },
+  { value: "DOT", label: "DOT (Polkadot)" },
+  { value: "SUI", label: "SUI" },
+  { value: "XPL", label: "XPL" },
+];
+const DEFAULT_NETWORK_BY_SYMBOL = {
+  SOL: "SOL",
+  TRX: "TRC20",
+  ARB: "ARB",
+  USDT: "TRC20",
+  USDC: "TRC20",
+  XRP: "XRP",
+  DOT: "DOT",
+  SUI: "SUI",
+  XPL: "XPL",
+  ETH: "ERC20",
+};
 const UPBIT_BASE_URL = "https://api.upbit.com/v1";
 const BITGET_BASE_URL = "https://api.bitget.com";
 const REFRESH_MS = 10000;
@@ -61,6 +87,11 @@ const formatGap = (value) => {
   if (!Number.isFinite(value)) return "N/A";
   return `${value.toFixed(2)}%`;
 };
+const getDefaultNetworkForSymbol = (symbol) => {
+  const key = (symbol || "").trim().toUpperCase();
+  return DEFAULT_NETWORK_BY_SYMBOL[key] || "TRC20";
+};
+
 
 const getStepMeta = (step) => STEP_META[step] || { label: "대기 중", color: "148,163,184" };
 
@@ -230,6 +261,7 @@ export default function App() {
     bitgetUsdtAddress: "",
     upbitSolAddress: "",
     symbolName: "SOL",
+    symbolNetwork: getDefaultNetworkForSymbol("SOL"),
     qty: "0.11",
   });
   const [maskedFields, setMaskedFields] = useState({
@@ -262,6 +294,11 @@ export default function App() {
     setMaskedFields((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
+  useEffect(() => {
+    const nextNetwork = getDefaultNetworkForSymbol(botForm.symbolName);
+    setBotForm((prev) => (prev.symbolNetwork === nextNetwork ? prev : { ...prev, symbolNetwork: nextNetwork }));
+  }, [botForm.symbolName]);
+
   const validateBotForm = () => {
     const requiredFields = [
       ["bitgetApiKey", "Bitget API Key"],
@@ -277,6 +314,10 @@ export default function App() {
       if (!botForm[field].trim()) {
         return `${label}을(를) 입력해 주세요.`;
       }
+    }
+
+    if (!botForm.symbolNetwork.trim()) {
+      return "Network is required.";
     }
 
     const qty = Number(botForm.qty);
@@ -308,6 +349,7 @@ export default function App() {
         BITGET_USDT_ADDRESS: botForm.bitgetUsdtAddress.trim(),
         UPBIT_SOL_ADDRESS: botForm.upbitSolAddress.trim(),
         SYMBOL_NAME: botForm.symbolName.trim() || "SOL",
+        SYMBOL_NETWORK: botForm.symbolNetwork.trim(),
         QTY: Number(botForm.qty),
       };
 
@@ -881,6 +923,20 @@ export default function App() {
                             className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
                             placeholder="SOL"
                           />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">Network</span>
+                          <select
+                            value={botForm.symbolNetwork}
+                            onChange={updateBotForm("symbolNetwork")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[var(--color-accent)]"
+                          >
+                            {NETWORK_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-[10px] text-text-muted">QTY</span>

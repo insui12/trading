@@ -162,7 +162,153 @@ class BotConfig(BaseModel):
     BITGET_USDT_ADDRESS: str
     UPBIT_SOL_ADDRESS: str
     SYMBOL_NAME: str = 'SOL'
+    SYMBOL_NETWORK: str = 'SOL'
     QTY: float = 0.11
+
+NETWORK_ALIASES = {
+    "TRC20": {"TRC20", "TRX", "TRON"},
+    "TRX": {"TRC20", "TRX", "TRON"},
+    "ERC20": {"ERC20", "ETH", "ETHEREUM"},
+    "ETH": {"ERC20", "ETH", "ETHEREUM"},
+    "BSC": {"BSC", "BEP20"},
+    "BEP20": {"BSC", "BEP20"},
+    "SOL": {"SOL", "SOLANA"},
+    "ARB": {"ARB", "ARBITRUM", "ARBITRUMONE", "ARBONE"},
+    "ARBITRUM": {"ARB", "ARBITRUM", "ARBITRUMONE", "ARBONE"},
+    "OP": {"OP", "OPTIMISM"},
+    "OPTIMISM": {"OP", "OPTIMISM"},
+    "MATIC": {"MATIC", "POLYGON"},
+    "POLYGON": {"MATIC", "POLYGON"},
+    "AVAXC": {"AVAXC", "AVAX", "AVALANCHE", "AVALANCHEC", "AVALANCHECCHAIN", "AVAXCCHAIN"},
+    "AVAX": {"AVAXC", "AVAX", "AVALANCHE", "AVALANCHEC", "AVALANCHECCHAIN", "AVAXCCHAIN"},
+    "XRP": {"XRP", "XRPL", "RIPPLE"},
+    "XRPL": {"XRP", "XRPL", "RIPPLE"},
+    "DOT": {"DOT", "POLKADOT"},
+    "POLKADOT": {"DOT", "POLKADOT"},
+    "SUI": {"SUI"},
+    "XPL": {"XPL"},
+}
+
+def normalize_network(value):
+    if not value:
+        return ""
+    return "".join(ch for ch in str(value).strip().upper() if ch.isalnum())
+
+def expand_network_aliases(value):
+    normalized = normalize_network(value)
+    aliases = NETWORK_ALIASES.get(normalized)
+    if aliases:
+        return {normalize_network(item) for item in aliases}
+    return {normalized}
+
+def network_supported(requested, available):
+    if not requested:
+        return False
+    requested_set = expand_network_aliases(requested)
+    available_set = {normalize_network(item) for item in available if item}
+    return bool(requested_set & available_set)
+
+def get_bitget_networks(bitget, symbol):
+    currencies = bitget.fetch_currencies()
+    currency = currencies.get(symbol)
+    if not currency:
+        return []
+    networks = currency.get('networks') or {}
+    names = set()
+    for key, net in networks.items():
+        if key:
+            names.add(str(key))
+        if isinstance(net, dict):
+            for field in ('id', 'network', 'name'):
+                value = net.get(field)
+                if value:
+                    names.add(str(value))
+    return sorted(names)
+
+def get_upbit_networks(access_key, secret_key, symbol):
+    params = {'currency': symbol}
+    query_string = urlencode(params).encode()
+    m = hashlib.sha512()
+    m.update(query_string)
+    query_hash = m.hexdigest()
+
+    payload_jwt = {
+        'access_key': access_key,
+        'nonce': str(uuid.uuid4()),
+        'query_hash': query_hash,
+        'query_hash_alg': 'SHA512',
+    }
+    jwt_token = jwt.encode(payload_jwt, secret_key, algorithm='HS256')
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+
+    res = requests.get("https://api.upbit.com/v1/withdraws/chance", params=params, headers=headers, timeout=10)
+    data = res.json()
+    if res.status_code != 200:
+        raise RuntimeError(data)
+
+    networks = set()
+    currency = data.get('currency')
+    if isinstance(currency, dict):
+        for key in ('net_type', 'network', 'withdraw_net_type'):
+            value = currency.get(key)
+            if value:
+                networks.add(str(value))
+
+    net_type = data.get('net_type')
+    if net_type:
+        networks.add(str(net_type))
+
+    network_list = data.get('networks')
+    if isinstance(network_list, list):
+        for item in network_list:
+            if isinstance(item, dict):
+                for key in ('net_type', 'network', 'name'):
+                    value = item.get(key)
+                    if value:
+                        networks.add(str(value))
+            elif isinstance(item, str):
+                networks.add(item)
+
+    return sorted(networks)
+
+def validate_symbol_network(cfg):
+    symbol = (cfg.SYMBOL_NAME or "").strip().upper()
+    network = (cfg.SYMBOL_NETWORK or "").strip()
+    if not symbol:
+        return "Symbol is required."
+    if not network:
+        return "Network is required."
+
+    bitget_options = {
+        'apiKey': cfg.BITGET_API['apiKey'],
+        'secret': cfg.BITGET_API['secret'],
+        'password': cfg.BITGET_API['password'],
+        'enableRateLimit': True,
+        'options': {'defaultType': 'spot'}
+    }
+    bitget = ccxt.bitget(bitget_options)
+    try:
+        bitget_networks = get_bitget_networks(bitget, symbol)
+        if not bitget_networks:
+            return f"Network validation failed: {symbol} not found on Bitget."
+        if not network_supported(network, bitget_networks):
+            return f"Network validation failed: {symbol} not supported on Bitget for network {network}."
+    except Exception as e:
+        return f"Network validation failed: Bitget lookup error ({e})."
+    finally:
+        try:
+            bitget.close()
+        except Exception:
+            pass
+
+    try:
+        upbit_networks = get_upbit_networks(cfg.UPBIT_ACCESS, cfg.UPBIT_SECRET, symbol)
+        if upbit_networks and not network_supported(network, upbit_networks):
+            return f"Network validation failed: {symbol} not supported on Upbit for network {network}."
+    except Exception as e:
+        return f"Network validation failed: Upbit lookup error ({e})."
+
+    return ""
 
 # === 4. 매매 로직 (스레드 실행용) ===
 def smart_order(exchange_name, order_type, symbol, qty, is_buy, api_context):
@@ -257,6 +403,7 @@ def run_trading_logic(cfg: BotConfig):
         api_context = {'bitget': bitget, 'upbit': upbit}
 
         SYMBOL = cfg.SYMBOL_NAME
+        NETWORK = cfg.SYMBOL_NETWORK
         QTY = cfg.QTY
 
         fut_symbol = f"{SYMBOL}/USDT:USDT"
@@ -320,7 +467,7 @@ def run_trading_logic(cfg: BotConfig):
                 trade_logger.error(" -> 잔액 부족으로 중단")
                 return
 
-            bitget.withdraw(SYMBOL, tx_qty, cfg.UPBIT_SOL_ADDRESS, params={'network': 'SOL'})
+            bitget.withdraw(SYMBOL, tx_qty, cfg.UPBIT_SOL_ADDRESS, params={'network': NETWORK})
             trade_logger.info(f" -> 출금 요청 완료 ({tx_qty} {SYMBOL})")
         except Exception as e:
             trade_logger.error(f"전송 실패: {e}")
@@ -506,6 +653,10 @@ def start_bot(config: BotConfig):
     if BOT_STATE["is_running"]:
         return {"success": False, "msg": "이미 실행 중입니다."}
     
+    network_error = validate_symbol_network(config)
+    if network_error:
+        return {"success": False, "msg": network_error}
+
     BOT_STATE["logs"] = [] # 로그 초기화
     reset_progress()
     BOT_STATE["status_msg"] = "실행 준비"
