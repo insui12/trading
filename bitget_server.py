@@ -695,10 +695,9 @@ def chain_analysis(request: ChainAnalysisRequest):
         return {"success": False, "msg": "All fields are required."}
 
     prompt = (
-        "?? ??? ?? ?? ??? ???. "
-        "??? ??? ? ????? ???: "
-        "[???1 -> ???2, ???/???, ? 00~00?]\n"
-        f"??: {departure} -> {destination}, {coin}/{chain}"
+        f"{departure}->{destination} {coin}/{chain} 이체할때 소요되는 이체시간을 추정해서 알려줘. "
+        "답변 양식은 정확하게, 오차는 최소로, 범위도 최소로 "
+        "[거래소1 -> 거래소2, 코인명/체인명, 약 00~00분 ]"
     )
 
     try:
