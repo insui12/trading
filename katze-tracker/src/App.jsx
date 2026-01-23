@@ -894,7 +894,7 @@ export default function App() {
                             <select
                               value={analysisForm.departure}
                               onChange={updateAnalysisForm("departure")}
-                              className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[var(--color-accent)]"
+                              className="w-full rounded-lg border border-border bg-bg-tertiary pl-[8px] pr-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[var(--color-accent)]"
                             >
                               <option value="">Select a departure</option>
                               {ANALYSIS_EXCHANGES.map((option) => (
@@ -909,7 +909,7 @@ export default function App() {
                             <select
                               value={analysisForm.destination}
                               onChange={updateAnalysisForm("destination")}
-                              className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[var(--color-accent)]"
+                              className="w-full rounded-lg border border-border bg-bg-tertiary pl-[8px] pr-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[var(--color-accent)]"
                             >
                               <option value="">Select a destination</option>
                               {ANALYSIS_EXCHANGES.map((option) => (
@@ -934,7 +934,7 @@ export default function App() {
                             <select
                               value={analysisForm.chain}
                               onChange={updateAnalysisForm("chain")}
-                              className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[var(--color-accent)]"
+                              className="w-full rounded-lg border border-border bg-bg-tertiary pl-[8px] pr-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[var(--color-accent)]"
                             >
                               <option value="">Select a network</option>
                               {NETWORK_OPTIONS.map((option) => (
@@ -1142,7 +1142,7 @@ export default function App() {
                           <select
                             value={botForm.symbolNetwork}
                             onChange={updateBotForm("symbolNetwork")}
-                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[var(--color-accent)]"
+                            className="w-full rounded-lg border border-border bg-bg-tertiary pl-[8px] pr-3 py-2 text-xs text-text-primary focus:outline-none focus:border-[var(--color-accent)]"
                           >
                             {NETWORK_OPTIONS.map((option) => (
                               <option key={option.value} value={option.value}>
