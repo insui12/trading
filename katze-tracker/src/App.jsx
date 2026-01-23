@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 const ICONS = {
   grid: <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />,
   eye: <><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></>,
+  eyeOff: <><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223a10.477 10.477 0 00-1.938 3.777C3.334 15.338 6.46 17.5 10 17.5c1.617 0 3.155-.379 4.507-1.05m2.453-2.005A10.445 10.445 0 0018.066 12C16.774 8.662 13.648 6.5 10 6.5c-.681 0-1.34.074-1.973.215" /><path strokeLinecap="round" strokeLinejoin="round" d="M4.707 4.707l14.586 14.586" /><path strokeLinecap="round" strokeLinejoin="round" d="M14.12 14.12a3 3 0 01-4.24-4.24" /></>,
   building: <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3h.75m-.75 3h.75m-.75 3h.75m-.75 3h.75" />,
   calculator: <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V18zm2.498-6.75h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V13.5zm0 2.25h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V18zm2.504-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zm0 2.25h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V18zm2.498-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zM8.25 6h7.5v2.25h-7.5V6zM12 2.25c-1.892 0-3.758.11-5.593.322C5.307 2.7 4.5 3.65 4.5 4.757V19.5a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25V4.757c0-1.108-.806-2.057-1.907-2.185A48.507 48.507 0 0012 2.25z" />,
   chart: <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />,
@@ -231,6 +232,13 @@ export default function App() {
     symbolName: "SOL",
     qty: "0.11",
   });
+  const [maskedFields, setMaskedFields] = useState({
+    bitgetApiKey: true,
+    bitgetSecret: true,
+    bitgetPassword: true,
+    upbitAccess: true,
+    upbitSecret: true,
+  });
   const [botStatus, setBotStatus] = useState({
     connected: false,
     running: false,
@@ -248,6 +256,10 @@ export default function App() {
   const updateBotForm = (field) => (event) => {
     const { value } = event.target;
     setBotForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleMask = (field) => {
+    setMaskedFields((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
   const validateBotForm = () => {
@@ -591,8 +603,8 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
-                <div className="flex flex-col gap-4 lg:col-span-2 min-h-0">
-                  <div className="bg-bg-card border border-border rounded-2xl flex flex-col shadow-sm flex-1 min-h-0">
+                <div className="flex flex-col gap-4 lg:col-span-2 min-h-0 min-w-0">
+                  <div className="bg-bg-card border border-border rounded-2xl flex flex-col shadow-sm flex-1 min-h-0 min-w-0">
                   <div className="px-5 py-4 border-b border-border flex justify-between items-center shrink-0 bg-bg-card rounded-t-2xl">
                     <div className="flex flex-col">
                       <h2 className="font-semibold text-sm text-text-primary">Price Gap Monitor</h2>
@@ -604,7 +616,7 @@ export default function App() {
                     </div>
                   </div>
                   
-                  <div className="flex-1 overflow-auto">
+                  <div className="flex-1 overflow-auto min-w-0">
                      {loading ? (
                        <div className="flex items-center justify-center h-full text-text-muted animate-pulse">Loading data...</div>
                      ) : (
@@ -679,7 +691,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="bg-bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col flex-1 min-h-0">
+                <div className="bg-bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col flex-1 min-h-0 min-w-0">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h2 className="font-semibold text-sm text-text-primary">Trade Logs</h2>
@@ -737,53 +749,108 @@ export default function App() {
                       <div className="flex flex-col gap-3 text-xs">
                         <label className="flex flex-col gap-1">
                           <span className="text-[10px] text-text-muted">Bitget API Key</span>
-                          <input
-                            type="text"
-                            value={botForm.bitgetApiKey}
-                            onChange={updateBotForm("bitgetApiKey")}
-                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
-                            placeholder="bitget api key"
-                          />
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => toggleMask("bitgetApiKey")}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary focus:outline-none"
+                              aria-label="Toggle Bitget API Key visibility"
+                              aria-pressed={!maskedFields.bitgetApiKey}
+                            >
+                              <SvgIcon name={maskedFields.bitgetApiKey ? "eye" : "eyeOff"} className="w-4 h-4" />
+                            </button>
+                            <input
+                              type={maskedFields.bitgetApiKey ? "password" : "text"}
+                              value={botForm.bitgetApiKey}
+                              onChange={updateBotForm("bitgetApiKey")}
+                              className="w-full rounded-lg border border-border bg-bg-tertiary pl-3 pr-9 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                              placeholder="bitget api key"
+                            />
+                          </div>
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-[10px] text-text-muted">Bitget Secret</span>
-                          <input
-                            type="password"
-                            value={botForm.bitgetSecret}
-                            onChange={updateBotForm("bitgetSecret")}
-                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
-                            placeholder="bitget secret"
-                          />
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => toggleMask("bitgetSecret")}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary focus:outline-none"
+                              aria-label="Toggle Bitget Secret visibility"
+                              aria-pressed={!maskedFields.bitgetSecret}
+                            >
+                              <SvgIcon name={maskedFields.bitgetSecret ? "eye" : "eyeOff"} className="w-4 h-4" />
+                            </button>
+                            <input
+                              type={maskedFields.bitgetSecret ? "password" : "text"}
+                              value={botForm.bitgetSecret}
+                              onChange={updateBotForm("bitgetSecret")}
+                              className="w-full rounded-lg border border-border bg-bg-tertiary pl-3 pr-9 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                              placeholder="bitget secret"
+                            />
+                          </div>
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-[10px] text-text-muted">Bitget Password</span>
-                          <input
-                            type="password"
-                            value={botForm.bitgetPassword}
-                            onChange={updateBotForm("bitgetPassword")}
-                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
-                            placeholder="bitget password"
-                          />
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => toggleMask("bitgetPassword")}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary focus:outline-none"
+                              aria-label="Toggle Bitget Password visibility"
+                              aria-pressed={!maskedFields.bitgetPassword}
+                            >
+                              <SvgIcon name={maskedFields.bitgetPassword ? "eye" : "eyeOff"} className="w-4 h-4" />
+                            </button>
+                            <input
+                              type={maskedFields.bitgetPassword ? "password" : "text"}
+                              value={botForm.bitgetPassword}
+                              onChange={updateBotForm("bitgetPassword")}
+                              className="w-full rounded-lg border border-border bg-bg-tertiary pl-3 pr-9 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                              placeholder="bitget password"
+                            />
+                          </div>
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-[10px] text-text-muted">Upbit Access Key</span>
-                          <input
-                            type="text"
-                            value={botForm.upbitAccess}
-                            onChange={updateBotForm("upbitAccess")}
-                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
-                            placeholder="upbit access key"
-                          />
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => toggleMask("upbitAccess")}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary focus:outline-none"
+                              aria-label="Toggle Upbit Access Key visibility"
+                              aria-pressed={!maskedFields.upbitAccess}
+                            >
+                              <SvgIcon name={maskedFields.upbitAccess ? "eye" : "eyeOff"} className="w-4 h-4" />
+                            </button>
+                            <input
+                              type={maskedFields.upbitAccess ? "password" : "text"}
+                              value={botForm.upbitAccess}
+                              onChange={updateBotForm("upbitAccess")}
+                              className="w-full rounded-lg border border-border bg-bg-tertiary pl-3 pr-9 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                              placeholder="upbit access key"
+                            />
+                          </div>
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-[10px] text-text-muted">Upbit Secret Key</span>
-                          <input
-                            type="password"
-                            value={botForm.upbitSecret}
-                            onChange={updateBotForm("upbitSecret")}
-                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
-                            placeholder="upbit secret key"
-                          />
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => toggleMask("upbitSecret")}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary focus:outline-none"
+                              aria-label="Toggle Upbit Secret Key visibility"
+                              aria-pressed={!maskedFields.upbitSecret}
+                            >
+                              <SvgIcon name={maskedFields.upbitSecret ? "eye" : "eyeOff"} className="w-4 h-4" />
+                            </button>
+                            <input
+                              type={maskedFields.upbitSecret ? "password" : "text"}
+                              value={botForm.upbitSecret}
+                              onChange={updateBotForm("upbitSecret")}
+                              className="w-full rounded-lg border border-border bg-bg-tertiary pl-3 pr-9 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                              placeholder="upbit secret key"
+                            />
+                          </div>
                         </label>
                         <label className="flex flex-col gap-1">
                           <span className="text-[10px] text-text-muted">Bitget USDT Address</span>
