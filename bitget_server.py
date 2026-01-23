@@ -189,10 +189,25 @@ NETWORK_ALIASES = {
     "XPL": {"XPL"},
 }
 
+UPBIT_NET_TYPE_MAP = {
+    "TRC20": "TRX",
+    "TRX": "TRX",
+    "ERC20": "ETH",
+    "ETH": "ETH",
+    "BEP20": "BSC",
+    "BSC": "BSC",
+}
+
 def normalize_network(value):
     if not value:
         return ""
     return "".join(ch for ch in str(value).strip().upper() if ch.isalnum())
+
+def normalize_upbit_net_type(value):
+    normalized = normalize_network(value)
+    if not normalized:
+        return ""
+    return UPBIT_NET_TYPE_MAP.get(normalized, normalized)
 
 def expand_network_aliases(value):
     normalized = normalize_network(value)
@@ -225,8 +240,11 @@ def get_bitget_networks(bitget, symbol):
                     names.add(str(value))
     return sorted(names)
 
-def get_upbit_networks(access_key, secret_key, symbol):
+def get_upbit_networks(access_key, secret_key, symbol, network=None):
     params = {'currency': symbol}
+    net_type = normalize_upbit_net_type(network)
+    if net_type:
+        params['net_type'] = net_type
     query_string = urlencode(params).encode()
     m = hashlib.sha512()
     m.update(query_string)
@@ -239,6 +257,8 @@ def get_upbit_networks(access_key, secret_key, symbol):
         'query_hash_alg': 'SHA512',
     }
     jwt_token = jwt.encode(payload_jwt, secret_key, algorithm='HS256')
+    if isinstance(jwt_token, bytes):
+        jwt_token = jwt_token.decode("utf-8")
     headers = {"Authorization": f"Bearer {jwt_token}"}
 
     res = requests.get("https://api.upbit.com/v1/withdraws/chance", params=params, headers=headers, timeout=10)
@@ -302,7 +322,7 @@ def validate_symbol_network(cfg):
             pass
 
     try:
-        upbit_networks = get_upbit_networks(cfg.UPBIT_ACCESS, cfg.UPBIT_SECRET, symbol)
+        upbit_networks = get_upbit_networks(cfg.UPBIT_ACCESS, cfg.UPBIT_SECRET, symbol, network)
         if upbit_networks and not network_supported(network, upbit_networks):
             return f"Network validation failed: {symbol} not supported on Upbit for network {network}."
     except Exception as e:

@@ -307,7 +307,7 @@ export default function App() {
       ["upbitAccess", "Upbit Access"],
       ["upbitSecret", "Upbit Secret"],
       ["bitgetUsdtAddress", "Bitget USDT Address"],
-      ["upbitSolAddress", "Upbit SOL Address"],
+      ["upbitSolAddress", "Upbit Symbol Address"],
     ];
 
     for (const [field, label] of requiredFields) {
@@ -905,13 +905,13 @@ export default function App() {
                           />
                         </label>
                         <label className="flex flex-col gap-1">
-                          <span className="text-[10px] text-text-muted">Upbit SOL Address</span>
+                          <span className="text-[10px] text-text-muted">Upbit Symbol Address</span>
                           <input
                             type="text"
                             value={botForm.upbitSolAddress}
                             onChange={updateBotForm("upbitSolAddress")}
                             className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
-                            placeholder="upbit SOL address"
+                            placeholder="upbit symbol address"
                           />
                         </label>
                         <label className="flex flex-col gap-1">
