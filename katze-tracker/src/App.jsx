@@ -35,6 +35,16 @@ const REFRESH_MS = 10000;
 const LOCAL_API_BASE = "http://127.0.0.1:8000";
 const LOCAL_WS_URL = "ws://127.0.0.1:8000/ws/logs";
 const LOG_LIMIT = 200;
+const STEP_META = {
+  1: { label: "매수", color: "34,197,94" },
+  2: { label: "헷징", color: "239,68,68" },
+  3: { label: "전송", color: "249,115,22" },
+  4: { label: "입금 확인", color: "14,165,233" },
+  5: { label: "매도", color: "168,85,247" },
+  6: { label: "숏 정리", color: "20,184,166" },
+  7: { label: "환전", color: "245,158,11" },
+  8: { label: "USDT 전송", color: "250,204,21" },
+};
 
 const toNumber = (value) => {
   const num = typeof value === "string" ? Number(value) : value;
@@ -50,6 +60,8 @@ const formatGap = (value) => {
   if (!Number.isFinite(value)) return "N/A";
   return `${value.toFixed(2)}%`;
 };
+
+const getStepMeta = (step) => STEP_META[step] || { label: "대기 중", color: "148,163,184" };
 
 async function fetchUpbitMarketSet() {
   const response = await fetch(`${UPBIT_BASE_URL}/market/all?isDetails=false`);
@@ -218,9 +230,15 @@ export default function App() {
     upbitSolAddress: "",
     symbolName: "SOL",
     qty: "0.11",
-    startStep: "1",
   });
-  const [botStatus, setBotStatus] = useState({ connected: false, running: false, msg: "대기 중" });
+  const [botStatus, setBotStatus] = useState({
+    connected: false,
+    running: false,
+    msg: "대기 중",
+    currentStep: 0,
+    currentStepLabel: "",
+    currentStepTotal: 8,
+  });
   const [botError, setBotError] = useState("");
   const [botActionLoading, setBotActionLoading] = useState(false);
   const [tradeLogs, setTradeLogs] = useState([]);
@@ -254,11 +272,6 @@ export default function App() {
       return "QTY는 0보다 큰 숫자여야 합니다.";
     }
 
-    const startStep = Number(botForm.startStep);
-    if (!Number.isInteger(startStep) || startStep < 1) {
-      return "START_STEP은 1 이상의 정수여야 합니다.";
-    }
-
     return "";
   };
 
@@ -284,7 +297,6 @@ export default function App() {
         UPBIT_SOL_ADDRESS: botForm.upbitSolAddress.trim(),
         SYMBOL_NAME: botForm.symbolName.trim() || "SOL",
         QTY: Number(botForm.qty),
-        START_STEP: Number(botForm.startStep),
       };
 
       const response = await fetch(`${LOCAL_API_BASE}/start`, {
@@ -299,7 +311,14 @@ export default function App() {
       }
       setTradeLogs([]);
       hasSeededLogsRef.current = false;
-      setBotStatus((prev) => ({ ...prev, running: true, msg: result.msg || "실행 중..." }));
+      setBotStatus((prev) => ({
+        ...prev,
+        running: true,
+        msg: result.msg || "실행 중...",
+        currentStep: 0,
+        currentStepLabel: "",
+        currentStepTotal: prev.currentStepTotal || 8,
+      }));
     } catch (error) {
       setBotError("로컬 서버에 연결할 수 없습니다.");
     } finally {
@@ -327,6 +346,12 @@ export default function App() {
 
   const startDisabled = botActionLoading || botStatus.running || !botStatus.connected;
   const stopDisabled = botActionLoading || !botStatus.running || !botStatus.connected;
+  const progressTotal = botStatus.currentStepTotal || 8;
+  const progressCurrent = Math.min(botStatus.currentStep || 0, progressTotal);
+  const progressRatio = progressTotal ? (progressCurrent / progressTotal) * 100 : 0;
+  const stepMeta = getStepMeta(progressCurrent);
+  const stepLabel = botStatus.currentStepLabel || stepMeta.label;
+  const stepColor = stepMeta.color;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -437,10 +462,15 @@ export default function App() {
         if (!response.ok) throw new Error("Status error");
         const payload = await response.json();
         if (!active) return;
+        const stepTotal = Number(payload.current_step_total) || 8;
+        const stepValue = Number(payload.current_step) || 0;
         setBotStatus({
           connected: true,
           running: Boolean(payload.is_running),
           msg: payload.status_msg || "대기 중",
+          currentStep: stepValue,
+          currentStepLabel: payload.current_step_label || "",
+          currentStepTotal: stepTotal,
         });
         if (!hasSeededLogsRef.current && Array.isArray(payload.logs) && payload.logs.length) {
           setTradeLogs(payload.logs);
@@ -681,6 +711,28 @@ export default function App() {
                         </span>
                       </div>
 
+                      <div className="mt-3 rounded-xl border border-border bg-bg-tertiary/40 p-3">
+                        <div className="flex items-center justify-between text-[10px] text-text-muted">
+                          <span>진행 단계</span>
+                          <span>{progressCurrent}/{progressTotal}</span>
+                        </div>
+                        <div className="mt-2 h-2 rounded-full bg-bg-tertiary border border-border overflow-hidden">
+                          <div className="h-full bg-accent transition-all duration-300" style={{ width: `${progressRatio}%` }}></div>
+                        </div>
+                        <div className="mt-2">
+                          <span
+                            className="inline-flex items-center rounded-md border px-2 py-1 text-[10px] font-semibold"
+                            style={{
+                              color: `rgb(${stepColor})`,
+                              borderColor: `rgba(${stepColor}, 0.35)`,
+                              backgroundColor: `rgba(${stepColor}, 0.15)`,
+                            }}
+                          >
+                            {`Step ${progressCurrent}/${progressTotal} ${stepLabel}`}
+                          </span>
+                        </div>
+                      </div>
+
                       <div className="mt-3 flex flex-col gap-3 text-xs">
                         <label className="flex flex-col gap-1">
                           <span className="text-[10px] text-text-muted">Bitget API Key</span>
@@ -772,18 +824,6 @@ export default function App() {
                             onChange={updateBotForm("qty")}
                             className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
                             placeholder="0.11"
-                          />
-                        </label>
-                        <label className="flex flex-col gap-1">
-                          <span className="text-[10px] text-text-muted">START_STEP</span>
-                          <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            value={botForm.startStep}
-                            onChange={updateBotForm("startStep")}
-                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
-                            placeholder="1"
                           />
                         </label>
                       </div>

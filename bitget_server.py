@@ -47,7 +47,22 @@ async def add_pna_header(request, call_next):
 BOT_STATE = {
     "is_running": False,
     "logs": [],
-    "status_msg": "대기 중"
+    "status_msg": "대기 중",
+    "current_step": 0,
+    "current_step_label": "",
+    "current_step_total": 8
+}
+
+DISPLAY_STEP_TOTAL = 8
+DISPLAY_STEP_MAP = {
+    2: (1, "매수"),
+    3: (2, "헷징"),
+    4: (3, "전송"),
+    5: (4, "입금 확인"),
+    6: (5, "매도"),
+    7: (6, "숏 정리"),
+    8: (7, "환전"),
+    9: (8, "USDT 전송"),
 }
 
 # 로그를 메모리에 저장하여 웹으로 전송하는 핸들러
@@ -116,6 +131,29 @@ file_handler = DailyFileHandler(LOG_DIR)
 file_handler.setFormatter(formatter)
 trade_logger.addHandler(file_handler)
 
+def reset_progress():
+    BOT_STATE["current_step"] = 0
+    BOT_STATE["current_step_label"] = ""
+    BOT_STATE["current_step_total"] = DISPLAY_STEP_TOTAL
+
+def update_display_step(step_num, label):
+    BOT_STATE["current_step"] = step_num
+    BOT_STATE["current_step_label"] = label
+    BOT_STATE["current_step_total"] = DISPLAY_STEP_TOTAL
+    status = f"Step {step_num}/{DISPLAY_STEP_TOTAL} {label}"
+    BOT_STATE["status_msg"] = status
+    trade_logger.info(status)
+
+def stop_requested():
+    return not BOT_STATE["is_running"]
+
+def handle_stop():
+    if stop_requested():
+        BOT_STATE["status_msg"] = "중단됨"
+        trade_logger.info("중단 요청으로 종료")
+        return True
+    return False
+
 # === 3. 데이터 모델 ===
 class BotConfig(BaseModel):
     BITGET_API: dict
@@ -125,39 +163,82 @@ class BotConfig(BaseModel):
     UPBIT_SOL_ADDRESS: str
     SYMBOL_NAME: str = 'SOL'
     QTY: float = 0.11
-    START_STEP: int = 1
 
 # === 4. 매매 로직 (스레드 실행용) ===
-def smart_order(exchange_name, api_context, symbol, qty, is_buy):
-    # (사용자님의 smart_order 로직을 여기에 통합합니다. API 객체는 인자로 받습니다.)
-    try:
-        bitget = api_context['bitget']
-        upbit = api_context['upbit']
-        # ... 기존 주문 로직 ...
-        price = 0
-        if exchange_name == 'bitget':
-            ticker = bitget.fetch_ticker(symbol)
-            price = ticker['ask'] if is_buy else ticker['bid']
-        else:
-            ob = pyupbit.get_orderbook(symbol)
-            price = ob['orderbook_units'][0]['ask_price'] if is_buy else ob['orderbook_units'][0]['bid_price']
-        
-        side = "BUY" if is_buy else "SELL"
-        trade_logger.info(f"[{exchange_name}] {side} 주문 시도: {price} (수량: {qty})")
-        # 실제 주문 코드는 여기에 복사... (간략화함)
-        time.sleep(1)
-        trade_logger.info(f"[{exchange_name}] {side} 주문 완료(시뮬레이션)")
-        return True
-    except Exception as e:
-        trade_logger.error(f"주문 오류: {e}")
-        return False
+def smart_order(exchange_name, order_type, symbol, qty, is_buy, api_context):
+    attempt = 1
+    bitget = api_context['bitget']
+    upbit = api_context['upbit']
+
+    while True:
+        if handle_stop():
+            return False
+        try:
+            price = 0
+            if exchange_name == 'bitget':
+                ticker = bitget.fetch_ticker(symbol)
+                price = ticker['ask'] if is_buy else ticker['bid']
+            else: # upbit
+                ob = pyupbit.get_orderbook(symbol)
+                price = ob['orderbook_units'][0]['ask_price'] if is_buy else ob['orderbook_units'][0]['bid_price']
+
+            trade_logger.info(f" -> [{attempt}회차] {'매수' if is_buy else '매도'} 시도: {price} (수량: {qty})")
+
+            order_id = None
+            if exchange_name == 'bitget':
+                if is_buy:
+                    order = bitget.create_limit_buy_order(symbol, qty, price)
+                else:
+                    order = bitget.create_limit_sell_order(symbol, qty, price)
+                order_id = order['id']
+            else: # upbit
+                if is_buy:
+                    res = upbit.buy_limit_order(symbol, price, qty)
+                else:
+                    res = upbit.sell_limit_order(symbol, price, qty)
+                if 'uuid' not in res:
+                    time.sleep(1)
+                    continue
+                order_id = res['uuid']
+
+            is_filled = False
+            for _ in range(5):
+                if handle_stop():
+                    return False
+                time.sleep(1)
+                if exchange_name == 'bitget':
+                    status = bitget.fetch_order(order_id, symbol)['status']
+                else:
+                    status = upbit.get_order(order_id).get('state')
+
+                if status in ['closed', 'done']:
+                    is_filled = True
+                    break
+
+            if is_filled:
+                trade_logger.info(f" -> [체결 완료] {exchange_name} 주문 성공")
+                return True
+
+            trade_logger.info(" -> 미체결: 취소 후 갱신")
+            if exchange_name == 'bitget':
+                try:
+                    bitget.cancel_order(order_id, symbol)
+                except Exception:
+                    pass
+            else:
+                upbit.cancel_order(order_id)
+            time.sleep(0.5)
+            attempt += 1
+        except Exception as e:
+            trade_logger.error(f"스마트 주문 중 에러: {e}")
+            time.sleep(1)
 
 def run_trading_logic(cfg: BotConfig):
     BOT_STATE["is_running"] = True
     BOT_STATE["status_msg"] = "실행 중..."
-    
+    reset_progress()
+
     try:
-        # API 객체 초기화
         bitget_options = {
             'apiKey': cfg.BITGET_API['apiKey'],
             'secret': cfg.BITGET_API['secret'],
@@ -166,49 +247,217 @@ def run_trading_logic(cfg: BotConfig):
             'options': {'defaultType': 'spot'}
         }
         bitget = ccxt.bitget(bitget_options)
-        
+
         bitget_future_options = bitget_options.copy()
         bitget_future_options['options'] = {'defaultType': 'swap'}
         bitget_future = ccxt.bitget(bitget_future_options)
-        
+
         upbit = pyupbit.Upbit(cfg.UPBIT_ACCESS, cfg.UPBIT_SECRET)
-        
+
         api_context = {'bitget': bitget, 'upbit': upbit}
 
-        # 주요 변수
         SYMBOL = cfg.SYMBOL_NAME
         QTY = cfg.QTY
-        STEP = cfg.START_STEP
-        
-        logger.info(f"=== 봇 시작 (Step {STEP}) ===")
 
-        # [단계별 로직]
-        # 사용자가 'Stop'을 누르면 루프를 탈출하도록 if BOT_STATE["is_running"] 체크
-        
-        if STEP <= 1 and BOT_STATE["is_running"]:
-            logger.info("[1] 설정: 레버리지 초기화")
-            try:
-                fut_sym = f"{SYMBOL}/USDT:USDT"
-                bitget_future.set_leverage(1, fut_sym)
-                bitget_future.set_position_mode(False, fut_sym)
-            except: pass
+        fut_symbol = f"{SYMBOL}/USDT:USDT"
+        bg_symbol = f"{SYMBOL}/USDT"
+        up_symbol = f"KRW-{SYMBOL}"
+        up_usdt_symbol = "KRW-USDT"
 
-        if STEP <= 2 and BOT_STATE["is_running"]:
-            logger.info("[2] 진입: 비트겟 현물 매수")
-            bg_sym = f"{SYMBOL}/USDT"
-            smart_order('bitget', api_context, bg_sym, QTY, True)
+        tx_qty = 0
 
-        # ... (3단계 ~ 9단계 로직도 동일한 패턴으로 여기에 넣으세요) ...
-        # ... time.sleep()이 있는 구간마다 BOT_STATE["is_running"] 체크 권장 ...
+        logger.info("=== [Arbitrage Bot] 시작 ===")
 
-        logger.info("=== 모든 작업 완료 ===")
+        if handle_stop():
+            return
+
+        # [1] 설정 (표시하지 않음)
+        logger.info("[1] 설정: 비트겟 안전장치 가동")
+        try:
+            bitget_future.set_leverage(1, fut_symbol)
+            bitget_future.set_position_mode(False, fut_symbol)
+        except Exception:
+            pass
+
+        if handle_stop():
+            return
+
+        # [2] 진입 (매수) -> 표시 Step 1
+        update_display_step(1, "매수")
+        trade_logger.info("비트겟 현물 스마트 매수")
+        bal = bitget.fetch_balance()
+        if bal['total'].get(SYMBOL, 0) >= QTY * 0.9:
+            trade_logger.info(" -> [Skip] 이미 보유 중입니다.")
+        else:
+            if not smart_order('bitget', 'limit', bg_symbol, QTY, True, api_context):
+                return
+
+        if handle_stop():
+            return
+
+        # [3] 방어 (헷징) -> 표시 Step 2
+        update_display_step(2, "헷징")
+        trade_logger.info("비트겟 선물 숏 헷징")
+        try:
+            bitget_future.create_market_sell_order(fut_symbol, QTY)
+            trade_logger.info(" -> 숏 포지션 진입 완료")
+        except Exception as e:
+            trade_logger.error(f"숏 진입 실패: {e}")
+            return
+
+        if handle_stop():
+            return
+
+        # [4] 이동 (전송) -> 표시 Step 3
+        update_display_step(3, "전송")
+        trade_logger.info("비트겟 -> 업비트 전송")
+        try:
+            bal = bitget.fetch_balance()
+            avail = bal['free'].get(SYMBOL, 0)
+            tx_qty = math.floor(avail * 10000) / 10000
+
+            if tx_qty < 0.05:
+                trade_logger.error(" -> 잔액 부족으로 중단")
+                return
+
+            bitget.withdraw(SYMBOL, tx_qty, cfg.UPBIT_SOL_ADDRESS, params={'network': 'SOL'})
+            trade_logger.info(f" -> 출금 요청 완료 ({tx_qty} {SYMBOL})")
+        except Exception as e:
+            trade_logger.error(f"전송 실패: {e}")
+            return
+
+        if handle_stop():
+            return
+
+        # [5] 검증 (입금 대기) -> 표시 Step 4
+        update_display_step(4, "입금 확인")
+        trade_logger.info("업비트 입금 확인 대기")
+        start_bal = upbit.get_balance(up_symbol)
+        target_bal = start_bal + (tx_qty * 0.9)
+        trade_logger.info(f" -> 검증 시작 | 시작 잔고: {start_bal} | 목표 잔고: {target_bal}")
+
+        while True:
+            if handle_stop():
+                return
+            curr = upbit.get_balance(up_symbol)
+            if curr >= target_bal:
+                trade_logger.info(f" -> [확인 완료] 현재 잔고: {curr} >= 목표: {target_bal}")
+                break
+            trade_logger.info(f" -> 대기중... 현재: {curr} / 목표: {target_bal} (부족량: {target_bal - curr:.4f})")
+            time.sleep(10)
+
+        if handle_stop():
+            return
+
+        # [6] 청산 (업비트 매도) -> 표시 Step 5
+        update_display_step(5, "매도")
+        trade_logger.info("업비트 SOL 매도 (현금화)")
+        sell_qty = upbit.get_balance(up_symbol)
+        trade_logger.info(f" -> 현재 잔고 조회 결과: {sell_qty} SOL")
+
+        if sell_qty > 0.0001:
+            if not smart_order('upbit', 'limit', up_symbol, sell_qty, False, api_context):
+                return
+        else:
+            trade_logger.warning(" -> 매도할 잔고가 없습니다. (이미 팔렸거나 입금 안됨)")
+
+        if handle_stop():
+            return
+
+        # [7] 종료 (숏 정리) -> 표시 Step 6
+        update_display_step(6, "숏 정리")
+        trade_logger.info("비트겟 숏 포지션 정리")
+        try:
+            bitget_future.create_market_buy_order(fut_symbol, QTY, params={'reduceOnly': True})
+            trade_logger.info(" -> 숏 포지션 종료 완료")
+        except Exception as e:
+            trade_logger.error(f"숏 종료 실패 (수동 확인 필요): {e}")
+
+        if handle_stop():
+            return
+
+        # [8] 환전 (KRW -> USDT) -> 표시 Step 7
+        update_display_step(7, "환전")
+        trade_logger.info("KRW -> USDT 재매수")
+        time.sleep(2)
+
+        krw_bal = upbit.get_balance("KRW")
+        use_krw = krw_bal * 0.999
+
+        ob = pyupbit.get_orderbook(up_usdt_symbol)
+        curr_price = ob['orderbook_units'][0]['ask_price']
+        buy_usdt_qty = math.floor((use_krw / curr_price) * 10000) / 10000
+
+        if use_krw > 5000:
+            trade_logger.info(f" -> 환전 시도: {int(use_krw)}원 (약 {buy_usdt_qty} USDT)")
+            if not smart_order('upbit', 'limit', up_usdt_symbol, buy_usdt_qty, True, api_context):
+                return
+        else:
+            trade_logger.warning(" -> KRW 잔액 부족으로 환전 스킵")
+
+        if handle_stop():
+            return
+
+        # [9] 회수 (USDT 전송) -> 표시 Step 8
+        update_display_step(8, "USDT 전송")
+        trade_logger.info("USDT -> 비트겟 전송 (TRC20)")
+        time.sleep(2)
+
+        usdt_bal = upbit.get_balance(up_usdt_symbol)
+        raw_qty = usdt_bal - 1.5
+        send_qty = math.floor(raw_qty * 100) / 100
+
+        if send_qty <= 0:
+            trade_logger.warning(" -> 보낼 USDT 잔액이 부족합니다.")
+            return
+
+        trade_logger.info(f" -> 전송 시도: {send_qty} USDT -> {cfg.BITGET_USDT_ADDRESS}")
+
+        try:
+            payload = {
+                'currency': 'USDT',
+                'net_type': 'TRX',
+                'amount': str(send_qty),
+                'address': cfg.BITGET_USDT_ADDRESS,
+                'transaction_type': 'default'
+            }
+
+            query_string = urlencode(payload).encode()
+            m = hashlib.sha512()
+            m.update(query_string)
+            query_hash = m.hexdigest()
+
+            payload_jwt = {
+                'access_key': cfg.UPBIT_ACCESS,
+                'nonce': str(uuid.uuid4()),
+                'query_hash': query_hash,
+                'query_hash_alg': 'SHA512',
+            }
+            jwt_token = jwt.encode(payload_jwt, cfg.UPBIT_SECRET, algorithm='HS256')
+            authorize_token = 'Bearer {}'.format(jwt_token)
+            headers = {"Authorization": authorize_token}
+
+            res = requests.post("https://api.upbit.com/v1/withdraws/coin", json=payload, headers=headers)
+            result = res.json()
+
+            if 'uuid' in result:
+                trade_logger.info(f" -> [성공] 출금 신청 완료! (UUID: {result['uuid']})")
+            else:
+                trade_logger.error(f" -> 송금 요청 실패: {result}")
+        except Exception as e:
+            trade_logger.error(f" -> 송금 중 에러 발생: {e}")
+            trade_logger.error(traceback.format_exc())
+
+        trade_logger.info("=== 프로세스 종료 ===")
+        BOT_STATE["status_msg"] = "완료"
 
     except Exception as e:
-        logger.error(f"봇 실행 중 오류: {e}")
-        logger.error(traceback.format_exc())
+        trade_logger.error(f"봇 실행 중 오류: {e}")
+        trade_logger.error(traceback.format_exc())
     finally:
         BOT_STATE["is_running"] = False
-        BOT_STATE["status_msg"] = "대기 중"
+        if BOT_STATE["status_msg"] == "실행 중...":
+            BOT_STATE["status_msg"] = "대기 중"
 
 # === 5. API 엔드포인트 ===
 @app.get("/")
@@ -220,7 +469,10 @@ def get_status():
     return {
         "is_running": BOT_STATE["is_running"],
         "status_msg": BOT_STATE["status_msg"],
-        "logs": BOT_STATE["logs"][-50:]
+        "logs": BOT_STATE["logs"][-50:],
+        "current_step": BOT_STATE["current_step"],
+        "current_step_label": BOT_STATE["current_step_label"],
+        "current_step_total": BOT_STATE["current_step_total"]
     }
 
 @app.websocket("/ws/logs")
@@ -255,6 +507,8 @@ def start_bot(config: BotConfig):
         return {"success": False, "msg": "이미 실행 중입니다."}
     
     BOT_STATE["logs"] = [] # 로그 초기화
+    reset_progress()
+    BOT_STATE["status_msg"] = "실행 준비"
     
     # 서버 응답성을 위해 별도 스레드에서 로직 실행
     t = threading.Thread(target=run_trading_logic, args=(config,))
@@ -266,6 +520,7 @@ def start_bot(config: BotConfig):
 @app.post("/stop")
 def stop_bot():
     BOT_STATE["is_running"] = False # 로직 내부에서 이 값을 보고 멈춤
+    BOT_STATE["status_msg"] = "중단 요청됨"
     return {"success": True, "msg": "중단 요청됨"}
 
 if __name__ == "__main__":
