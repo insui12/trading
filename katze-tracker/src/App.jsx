@@ -32,6 +32,9 @@ const COINS = ["SOL", "TRX", "ARB", "USDT", "USDC", "XPL", "DOT", "XRP", "SUI"];
 const UPBIT_BASE_URL = "https://api.upbit.com/v1";
 const BITGET_BASE_URL = "https://api.bitget.com";
 const REFRESH_MS = 10000;
+const LOCAL_API_BASE = "http://127.0.0.1:8000";
+const LOCAL_WS_URL = "ws://127.0.0.1:8000/ws/logs";
+const LOG_LIMIT = 200;
 
 const toNumber = (value) => {
   const num = typeof value === "string" ? Number(value) : value;
@@ -205,6 +208,125 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const hasLoadedRef = useRef(false);
   const isFetchingRef = useRef(false);
+  const [botForm, setBotForm] = useState({
+    bitgetApiKey: "",
+    bitgetSecret: "",
+    bitgetPassword: "",
+    upbitAccess: "",
+    upbitSecret: "",
+    bitgetUsdtAddress: "",
+    upbitSolAddress: "",
+    symbolName: "SOL",
+    qty: "0.11",
+    startStep: "1",
+  });
+  const [botStatus, setBotStatus] = useState({ connected: false, running: false, msg: "대기 중" });
+  const [botError, setBotError] = useState("");
+  const [botActionLoading, setBotActionLoading] = useState(false);
+  const [tradeLogs, setTradeLogs] = useState([]);
+  const [logConnection, setLogConnection] = useState("disconnected");
+  const hasSeededLogsRef = useRef(false);
+
+  const updateBotForm = (field) => (event) => {
+    const { value } = event.target;
+    setBotForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const validateBotForm = () => {
+    const requiredFields = [
+      ["bitgetApiKey", "Bitget API Key"],
+      ["bitgetSecret", "Bitget Secret"],
+      ["bitgetPassword", "Bitget Password"],
+      ["upbitAccess", "Upbit Access"],
+      ["upbitSecret", "Upbit Secret"],
+      ["bitgetUsdtAddress", "Bitget USDT Address"],
+      ["upbitSolAddress", "Upbit SOL Address"],
+    ];
+
+    for (const [field, label] of requiredFields) {
+      if (!botForm[field].trim()) {
+        return `${label}을(를) 입력해 주세요.`;
+      }
+    }
+
+    const qty = Number(botForm.qty);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return "QTY는 0보다 큰 숫자여야 합니다.";
+    }
+
+    const startStep = Number(botForm.startStep);
+    if (!Number.isInteger(startStep) || startStep < 1) {
+      return "START_STEP은 1 이상의 정수여야 합니다.";
+    }
+
+    return "";
+  };
+
+  const handleStart = async () => {
+    setBotError("");
+    const validationError = validateBotForm();
+    if (validationError) {
+      setBotError(validationError);
+      return;
+    }
+
+    setBotActionLoading(true);
+    try {
+      const payload = {
+        BITGET_API: {
+          apiKey: botForm.bitgetApiKey.trim(),
+          secret: botForm.bitgetSecret.trim(),
+          password: botForm.bitgetPassword.trim(),
+        },
+        UPBIT_ACCESS: botForm.upbitAccess.trim(),
+        UPBIT_SECRET: botForm.upbitSecret.trim(),
+        BITGET_USDT_ADDRESS: botForm.bitgetUsdtAddress.trim(),
+        UPBIT_SOL_ADDRESS: botForm.upbitSolAddress.trim(),
+        SYMBOL_NAME: botForm.symbolName.trim() || "SOL",
+        QTY: Number(botForm.qty),
+        START_STEP: Number(botForm.startStep),
+      };
+
+      const response = await fetch(`${LOCAL_API_BASE}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        setBotError(result.msg || "봇 시작에 실패했습니다.");
+        return;
+      }
+      setTradeLogs([]);
+      hasSeededLogsRef.current = false;
+      setBotStatus((prev) => ({ ...prev, running: true, msg: result.msg || "실행 중..." }));
+    } catch (error) {
+      setBotError("로컬 서버에 연결할 수 없습니다.");
+    } finally {
+      setBotActionLoading(false);
+    }
+  };
+
+  const handleStop = async () => {
+    setBotError("");
+    setBotActionLoading(true);
+    try {
+      const response = await fetch(`${LOCAL_API_BASE}/stop`, { method: "POST" });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        setBotError(result.msg || "중단 요청에 실패했습니다.");
+        return;
+      }
+      setBotStatus((prev) => ({ ...prev, running: false, msg: result.msg || "대기 중" }));
+    } catch (error) {
+      setBotError("로컬 서버에 연결할 수 없습니다.");
+    } finally {
+      setBotActionLoading(false);
+    }
+  };
+
+  const startDisabled = botActionLoading || botStatus.running || !botStatus.connected;
+  const stopDisabled = botActionLoading || !botStatus.running || !botStatus.connected;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -306,6 +428,81 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    const fetchStatus = async () => {
+      try {
+        const response = await fetch(`${LOCAL_API_BASE}/status`);
+        if (!response.ok) throw new Error("Status error");
+        const payload = await response.json();
+        if (!active) return;
+        setBotStatus({
+          connected: true,
+          running: Boolean(payload.is_running),
+          msg: payload.status_msg || "대기 중",
+        });
+        if (!hasSeededLogsRef.current && Array.isArray(payload.logs) && payload.logs.length) {
+          setTradeLogs(payload.logs);
+          hasSeededLogsRef.current = true;
+        }
+      } catch (error) {
+        if (!active) return;
+        setBotStatus((prev) => ({ ...prev, connected: false }));
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let ws;
+    let reconnectTimer;
+    let active = true;
+
+    const connect = () => {
+      if (!active) return;
+      setLogConnection("connecting");
+      ws = new WebSocket(LOCAL_WS_URL);
+
+      ws.onopen = () => {
+        if (active) setLogConnection("connected");
+      };
+      ws.onmessage = (event) => {
+        if (!active) return;
+        hasSeededLogsRef.current = true;
+        const line = String(event.data || "").trim();
+        if (!line) return;
+        setTradeLogs((prev) => {
+          const next = [...prev, line];
+          return next.length > LOG_LIMIT ? next.slice(-LOG_LIMIT) : next;
+        });
+      };
+      ws.onclose = () => {
+        if (!active) return;
+        setLogConnection("disconnected");
+        reconnectTimer = setTimeout(connect, 2000);
+      };
+      ws.onerror = () => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
+      };
+    };
+
+    connect();
+    return () => {
+      active = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (ws) ws.close();
+    };
+  }, []);
+
   return (
     // ✅ [핵심 수정] Flexbox 레이아웃 적용: 전체 화면을 가로로 나열하여 겹침 방지
     <div className="flex h-screen bg-bg-primary text-text-primary font-sans transition-colors duration-300 overflow-hidden">
@@ -363,91 +560,274 @@ export default function App() {
                 ))}
               </div>
 
-              {/* 대시보드 테이블 */}
-              <div className="bg-bg-card border border-border rounded-2xl flex-1 flex flex-col shadow-sm min-h-[400px]">
-                <div className="px-5 py-4 border-b border-border flex justify-between items-center shrink-0 bg-bg-card rounded-t-2xl">
-                  <div className="flex flex-col">
-                    <h2 className="font-semibold text-sm text-text-primary">Price Gap Monitor</h2>
-                    <p className="text-[10px] text-text-muted hidden md:block mt-0.5">Real-time arbitrage opportunities</p>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+                <div className="flex flex-col gap-4 lg:col-span-2 min-h-0">
+                  <div className="bg-bg-card border border-border rounded-2xl flex flex-col shadow-sm flex-1 min-h-0">
+                  <div className="px-5 py-4 border-b border-border flex justify-between items-center shrink-0 bg-bg-card rounded-t-2xl">
+                    <div className="flex flex-col">
+                      <h2 className="font-semibold text-sm text-text-primary">Price Gap Monitor</h2>
+                      <p className="text-[10px] text-text-muted hidden md:block mt-0.5">Real-time arbitrage opportunities</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-text-muted text-xs bg-bg-tertiary px-3 py-1.5 rounded-lg">
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+                        <span>{data.length} pairs</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-text-muted text-xs bg-bg-tertiary px-3 py-1.5 rounded-lg">
-                      <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
-                      <span>{data.length} pairs</span>
+                  
+                  <div className="flex-1 overflow-auto">
+                     {loading ? (
+                       <div className="flex items-center justify-center h-full text-text-muted animate-pulse">Loading data...</div>
+                     ) : (
+                       <table className="w-full text-left border-collapse min-w-[800px]">
+                          <thead className="bg-bg-secondary/95 sticky top-0 z-10 backdrop-blur-sm shadow-sm">
+                              <tr className="border-b border-border text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+                                  <th className="w-10 px-2 py-3 text-center">#</th>
+                                  <th className="px-5 py-3 text-center">Ticker</th>
+                                  <th className="px-5 py-3 text-center">Exchanges</th>
+                                  <th className="px-5 py-3 text-center">Price A</th>
+                                  <th className="px-5 py-3 text-center">Price B</th>
+                                  <th className="px-5 py-3 text-center">Gap</th>
+                                  <th className="px-5 py-3 text-center hidden xl:table-cell">Strategy</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                              {data.map((item, idx) => (
+                                  <tr key={item.id} className="group hover:bg-bg-hover transition-colors cursor-pointer">
+                                      <td className="px-2 py-3 text-center text-text-muted text-xs">{idx + 1}</td>
+                                      <td className="px-5 py-3 font-medium text-[13px] text-text-primary text-center">{item.ticker}</td>
+                                      <td className="px-5 py-3 text-center">
+                                          {item.exchangeA && item.exchangeB ? (
+                                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                              <ExchangeBadge name={item.exchangeA} size="sm" />
+                                              <span className="text-text-muted text-[10px]">&harr;</span>
+                                              <ExchangeBadge name={item.exchangeB} size="sm" />
+                                            </div>
+                                          ) : (
+                                            <span className="text-[10px] bg-bg-tertiary border border-border px-2 py-1 rounded text-text-muted whitespace-nowrap">
+                                              N/A
+                                            </span>
+                                          )}
+                                      </td>
+                                      <td className={`px-5 py-3 text-center font-mono text-[13px] ${Number.isFinite(item.priceA) ? 'text-text-primary/90' : 'text-text-muted'}`}>
+                                          {formatPrice(item.priceA)}
+                                      </td>
+                                      <td className={`px-5 py-3 text-center font-mono text-[13px] ${Number.isFinite(item.priceB) ? 'text-text-primary/90' : 'text-text-muted'}`}>
+                                          {formatPrice(item.priceB)}
+                                      </td>
+                                      <td className="px-5 py-3 text-center">
+                                          <div className={`inline-flex items-center px-2 py-1 rounded-md font-mono text-xs font-semibold ${Number.isFinite(item.gap) ? (item.gap > 0.5 ? 'bg-accent-muted text-accent border border-accent/20' : 'bg-bg-tertiary text-text-secondary border border-border') : 'bg-bg-tertiary text-text-muted border border-border'}`}>
+                                              {formatGap(item.gap)}
+                                          </div>
+                                      </td>
+                                      <td className="px-5 py-3 text-center hidden xl:table-cell">
+                                          {item.strategy ? (
+                                            <div className="flex items-center justify-center gap-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] text-[var(--color-positive)] font-semibold whitespace-nowrap">
+                                                      Long
+                                                    </span>
+                                                    <ExchangeBadge name={item.strategy.long} size="sm" />
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] text-[var(--color-negative)] font-semibold whitespace-nowrap">
+                                                      Short
+                                                    </span>
+                                                    <ExchangeBadge name={item.strategy.short} size="sm" />
+                                                </div>
+                                            </div>
+                                          ) : (
+                                            <span className="text-[10px] bg-bg-tertiary border border-border px-2 py-1 rounded text-text-muted whitespace-nowrap">
+                                              N/A
+                                            </span>
+                                          )}
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                       </table>
+                     )}
                   </div>
                 </div>
-                
-                <div className="flex-1 overflow-auto">
-                   {loading ? (
-                     <div className="flex items-center justify-center h-full text-text-muted animate-pulse">Loading data...</div>
-                   ) : (
-                     <table className="w-full text-left border-collapse min-w-[800px]">
-                        <thead className="bg-bg-secondary/95 sticky top-0 z-10 backdrop-blur-sm shadow-sm">
-                            <tr className="border-b border-border text-[10px] text-text-muted uppercase tracking-wider font-semibold">
-                                <th className="w-10 px-2 py-3 text-center">#</th>
-                                <th className="px-5 py-3 text-center">Ticker</th>
-                                <th className="px-5 py-3 text-center">Exchanges</th>
-                                <th className="px-5 py-3 text-center">Price A</th>
-                                <th className="px-5 py-3 text-center">Price B</th>
-                                <th className="px-5 py-3 text-center">Gap</th>
-                                <th className="px-5 py-3 text-center hidden xl:table-cell">Strategy</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {data.map((item, idx) => (
-                                <tr key={item.id} className="group hover:bg-bg-hover transition-colors cursor-pointer">
-                                    <td className="px-2 py-3 text-center text-text-muted text-xs">{idx + 1}</td>
-                                    <td className="px-5 py-3 font-medium text-[13px] text-text-primary text-center">{item.ticker}</td>
-                                    <td className="px-5 py-3 text-center">
-                                        {item.exchangeA && item.exchangeB ? (
-                                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                            <ExchangeBadge name={item.exchangeA} size="sm" />
-                                            <span className="text-text-muted text-[10px]">&harr;</span>
-                                            <ExchangeBadge name={item.exchangeB} size="sm" />
-                                          </div>
-                                        ) : (
-                                          <span className="text-[10px] bg-bg-tertiary border border-border px-2 py-1 rounded text-text-muted whitespace-nowrap">
-                                            N/A
-                                          </span>
-                                        )}
-                                    </td>
-                                    <td className={`px-5 py-3 text-center font-mono text-[13px] ${Number.isFinite(item.priceA) ? 'text-text-primary/90' : 'text-text-muted'}`}>
-                                        {formatPrice(item.priceA)}
-                                    </td>
-                                    <td className={`px-5 py-3 text-center font-mono text-[13px] ${Number.isFinite(item.priceB) ? 'text-text-primary/90' : 'text-text-muted'}`}>
-                                        {formatPrice(item.priceB)}
-                                    </td>
-                                    <td className="px-5 py-3 text-center">
-                                        <div className={`inline-flex items-center px-2 py-1 rounded-md font-mono text-xs font-semibold ${Number.isFinite(item.gap) ? (item.gap > 0.5 ? 'bg-accent-muted text-accent border border-accent/20' : 'bg-bg-tertiary text-text-secondary border border-border') : 'bg-bg-tertiary text-text-muted border border-border'}`}>
-                                            {formatGap(item.gap)}
-                                        </div>
-                                    </td>
-                                    <td className="px-5 py-3 text-center hidden xl:table-cell">
-                                        {item.strategy ? (
-                                          <div className="flex items-center justify-center gap-2">
-                                              <div className="flex items-center gap-1.5">
-                                                  <span className="text-[10px] text-[var(--color-positive)] font-semibold whitespace-nowrap">
-                                                    Long
-                                                  </span>
-                                                  <ExchangeBadge name={item.strategy.long} size="sm" />
-                                              </div>
-                                              <div className="flex items-center gap-1.5">
-                                                  <span className="text-[10px] text-[var(--color-negative)] font-semibold whitespace-nowrap">
-                                                    Short
-                                                  </span>
-                                                  <ExchangeBadge name={item.strategy.short} size="sm" />
-                                              </div>
-                                          </div>
-                                        ) : (
-                                          <span className="text-[10px] bg-bg-tertiary border border-border px-2 py-1 rounded text-text-muted whitespace-nowrap">
-                                            N/A
-                                          </span>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                     </table>
-                   )}
+
+                <div className="bg-bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col flex-1 min-h-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="font-semibold text-sm text-text-primary">Trade Logs</h2>
+                        <p className="text-[10px] text-text-muted mt-0.5">매매 관련 로그만 표시됩니다.</p>
+                      </div>
+                      <span className="text-[10px] text-text-muted">{tradeLogs.length} lines</span>
+                    </div>
+                    <div className="mt-3 flex-1 overflow-auto rounded-lg border border-border bg-bg-tertiary p-3 font-mono text-[11px] text-text-secondary">
+                      {tradeLogs.length ? (
+                        tradeLogs.map((line, idx) => (
+                          <div key={`${idx}-${line.slice(0, 12)}`} className="break-all">{line}</div>
+                        ))
+                      ) : (
+                        <div className="text-text-muted">아직 매매 로그가 없습니다.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-4 lg:col-span-1 min-h-0">
+                  <div className="bg-bg-card border border-border rounded-2xl p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h2 className="font-semibold text-sm text-text-primary">Auto Trading Control</h2>
+                          <p className="text-[10px] text-text-muted mt-0.5">Local agent: 127.0.0.1:8000</p>
+                        </div>
+                        <span className={`text-[10px] px-2 py-1 rounded-md border ${botStatus.connected ? 'bg-accent-muted text-accent border-[var(--color-accent)]' : 'bg-bg-tertiary text-text-muted border-border'}`}>
+                          {botStatus.connected ? 'Connected' : 'Offline'}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-col gap-3 text-xs">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">Bitget API Key</span>
+                          <input
+                            type="text"
+                            value={botForm.bitgetApiKey}
+                            onChange={updateBotForm("bitgetApiKey")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                            placeholder="bitget api key"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">Bitget Secret</span>
+                          <input
+                            type="password"
+                            value={botForm.bitgetSecret}
+                            onChange={updateBotForm("bitgetSecret")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                            placeholder="bitget secret"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">Bitget Password</span>
+                          <input
+                            type="password"
+                            value={botForm.bitgetPassword}
+                            onChange={updateBotForm("bitgetPassword")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                            placeholder="bitget password"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">Upbit Access Key</span>
+                          <input
+                            type="text"
+                            value={botForm.upbitAccess}
+                            onChange={updateBotForm("upbitAccess")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                            placeholder="upbit access key"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">Upbit Secret Key</span>
+                          <input
+                            type="password"
+                            value={botForm.upbitSecret}
+                            onChange={updateBotForm("upbitSecret")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                            placeholder="upbit secret key"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">Bitget USDT Address</span>
+                          <input
+                            type="text"
+                            value={botForm.bitgetUsdtAddress}
+                            onChange={updateBotForm("bitgetUsdtAddress")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                            placeholder="bitget USDT address"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">Upbit SOL Address</span>
+                          <input
+                            type="text"
+                            value={botForm.upbitSolAddress}
+                            onChange={updateBotForm("upbitSolAddress")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                            placeholder="upbit SOL address"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">Symbol</span>
+                          <input
+                            type="text"
+                            value={botForm.symbolName}
+                            onChange={updateBotForm("symbolName")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                            placeholder="SOL"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">QTY</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.0001"
+                            value={botForm.qty}
+                            onChange={updateBotForm("qty")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                            placeholder="0.11"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] text-text-muted">START_STEP</span>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={botForm.startStep}
+                            onChange={updateBotForm("startStep")}
+                            className="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-xs text-text-primary placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
+                            placeholder="1"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={handleStart}
+                          disabled={startDisabled}
+                          className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all ${startDisabled ? 'bg-bg-tertiary text-text-muted border border-border' : 'bg-accent text-white hover:brightness-125'}`}
+                        >
+                          {botActionLoading && !botStatus.running ? 'Starting...' : 'Start'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleStop}
+                          disabled={stopDisabled}
+                          className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all ${stopDisabled ? 'bg-bg-tertiary text-text-muted border border-border' : 'bg-[var(--color-negative)] text-white hover:brightness-125'}`}
+                        >
+                          {botActionLoading && botStatus.running ? 'Stopping...' : 'Stop'}
+                        </button>
+                      </div>
+
+                      <div className="mt-3 flex flex-col gap-1">
+                        <div className="flex items-center gap-2 text-[10px] text-text-muted">
+                          <span className={`status-dot ${botStatus.running ? 'status-dot-online' : 'status-dot-offline'}`}></span>
+                          <span>{botStatus.running ? 'Running' : 'Stopped'}</span>
+                          <span className="ml-auto">{botStatus.msg}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-text-muted">
+                          <span className={`status-dot ${logConnection === 'connected' ? 'status-dot-online' : logConnection === 'connecting' ? 'status-dot-warning' : 'status-dot-offline'}`}></span>
+                          <span>Log Stream</span>
+                          <span className="ml-auto">
+                            {logConnection === 'connected' ? 'Live' : logConnection === 'connecting' ? 'Connecting' : 'Offline'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {botError && (
+                        <div className="mt-3 text-[11px] text-negative">
+                          {botError}
+                        </div>
+                      )}
+                    </div>
                 </div>
               </div>
             </div>
