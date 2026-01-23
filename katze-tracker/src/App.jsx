@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import matgaLogoBlack from '../image/matga_logo_black.png';
+import matgaLogoWhite from '../image/matga_logo_white.png';
 
 // --- 1. 아이콘 및 데이터 상수 (변경 없음) ---
 const ICONS = {
@@ -198,13 +200,15 @@ const ExchangeBadge = ({ name, size = 'md' }) => {
 };
 
 // --- 2. 사이드바 컨텐츠 (재사용을 위해 분리) ---
-const SidebarContent = ({ activeNav, setActiveNav, isDark, setIsDark, setMobileMenuOpen }) => (
-  <>
+const SidebarContent = ({ activeNav, setActiveNav, isDark, setIsDark, setMobileMenuOpen }) => {
+  const logoSrc = isDark ? matgaLogoWhite : matgaLogoBlack;
+  return (
+    <>
     <div className="p-5 border-b border-border h-[73px] flex items-center shrink-0">
       <div className="flex items-center gap-3 w-full">
         <div className="w-10 h-10 rounded-xl overflow-hidden border border-accent/20 shadow-lg shadow-accent/10 flex-shrink-0 bg-black flex items-center justify-center">
             {/* 로고가 없을 경우를 대비한 Fallback 처리 */}
-            <img src="/logo.jpg" alt="K" className="w-full h-full object-cover opacity-80" onError={(e) => {e.target.style.display='none'; e.target.parentElement.innerText='K'}}/>
+            <img src={logoSrc} alt="MATGA" className="w-full h-full object-cover opacity-80" onError={(e) => {e.target.style.display='none'; e.target.parentElement.innerText='K'}}/>
         </div>
         <div className="lg:block md:hidden overflow-hidden whitespace-nowrap">
           <h1 className="text-text-primary font-semibold text-[15px]">MATGA</h1>
@@ -242,8 +246,9 @@ const SidebarContent = ({ activeNav, setActiveNav, isDark, setIsDark, setMobileM
           <span className="lg:block md:hidden">{isDark ? 'Dark Mode' : 'Light Mode'}</span>
       </button>
     </div>
-  </>
-);
+    </>
+  );
+};
 
 // --- 3. 메인 App 컴포넌트 ---
 export default function App() {
