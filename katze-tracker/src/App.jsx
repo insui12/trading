@@ -4,6 +4,7 @@ import matgaLogoWhite from '../image/matga_logo_white.png';
 
 // --- 1. 아이콘 및 데이터 상수 (변경 없음) ---
 const ICONS = {
+  home: <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 10.5V21a.75.75 0 00.75.75H9.75V15h4.5v6.75h4.5a.75.75 0 00.75-.75V10.5" />,
   grid: <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />,
   eye: <><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></>,
   eyeOff: <><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223a10.477 10.477 0 00-1.938 3.777C3.334 15.338 6.46 17.5 10 17.5c1.617 0 3.155-.379 4.507-1.05m2.453-2.005A10.445 10.445 0 0018.066 12C16.774 8.662 13.648 6.5 10 6.5c-.681 0-1.34.074-1.973.215" /><path strokeLinecap="round" strokeLinejoin="round" d="M4.707 4.707l14.586 14.586" /><path strokeLinecap="round" strokeLinejoin="round" d="M14.12 14.12a3 3 0 01-4.24-4.24" /></>,
@@ -16,6 +17,7 @@ const ICONS = {
 };
 
 const MENU_ITEMS = [
+  { id: "homepage", label: "Homepage", icon: "home" },
   { id: "dashboard", label: "Dashboard", icon: "grid" },
   { id: "watchlist", label: "Watchlist", icon: "eye" },
   { id: "exchanges", label: "Exchanges", icon: "building" },
@@ -329,6 +331,16 @@ export default function App() {
       }
       return next;
     });
+  };
+
+  const handleSelectSymbol = (symbol) => {
+    const nextSymbol = (symbol || "").trim().toUpperCase();
+    if (!nextSymbol) return;
+    setBotForm((prev) => ({
+      ...prev,
+      symbolName: nextSymbol,
+      symbolNetwork: getDefaultNetworkForSymbol(nextSymbol),
+    }));
   };
 
   const handleChainAnalysis = async () => {
@@ -753,7 +765,11 @@ export default function App() {
 
         {/* 메인 컨텐츠 영역 (스크롤 가능) */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          {activeNav === 'dashboard' ? (
+          {activeNav === 'homepage' ? (
+            <div className="flex h-full w-full">
+              <div className="flex-1 rounded-2xl border border-dashed border-border bg-bg-card/60"></div>
+            </div>
+          ) : activeNav === 'dashboard' ? (
             <div className="flex flex-col gap-4 max-w-[1600px] mx-auto pb-10 h-full">
               {/* 필터 바 */}
               <div className="flex items-center gap-5 flex-wrap bg-bg-card border border-border rounded-xl px-4 py-2.5 overflow-x-auto shrink-0">
@@ -800,7 +816,11 @@ export default function App() {
                           </thead>
                           <tbody className="divide-y divide-border">
                               {data.map((item, idx) => (
-                                  <tr key={item.id} className="group hover:bg-bg-hover transition-colors cursor-pointer">
+                                  <tr
+                                    key={item.id}
+                                    onClick={() => handleSelectSymbol(item.id)}
+                                    className="group hover:bg-bg-hover transition-colors cursor-pointer"
+                                  >
                                       <td className="px-2 py-3 text-center text-text-muted text-xs">{idx + 1}</td>
                                       <td className="px-5 py-3 font-medium text-[13px] text-text-primary text-center">{item.ticker}</td>
                                       <td className="px-5 py-3 text-center">
