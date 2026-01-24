@@ -75,7 +75,9 @@ const PROXY_BASE = "/.netlify/functions/proxy?url=";
 const buildProxyUrl = (url) => `${PROXY_BASE}${encodeURIComponent(url)}`;
 const REFRESH_MS = 10000;
 const DEMO_MODE = true;
+const CHAIN_ANALYSIS_ENABLED = true;
 const DEMO_NOTICE = "Demo mode: backend features are disabled.";
+const CHAIN_ANALYSIS_ENDPOINT = "/.netlify/functions/chain-analysis";
 const LOCAL_API_BASE = "http://127.0.0.1:8000";
 const LOCAL_WS_URL = "ws://127.0.0.1:8000/ws/logs";
 const LOG_LIMIT = 200;
@@ -373,7 +375,7 @@ export default function App() {
   };
 
   const handleChainAnalysis = async () => {
-    if (DEMO_MODE) {
+    if (!CHAIN_ANALYSIS_ENABLED) {
       setAnalysisError("");
       setAnalysisResult(DEMO_NOTICE);
       return;
@@ -396,7 +398,7 @@ export default function App() {
 
     setAnalysisLoading(true);
     try {
-      const response = await fetch(`${LOCAL_API_BASE}/chain-analysis`, {
+      const response = await fetch(CHAIN_ANALYSIS_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -408,7 +410,7 @@ export default function App() {
       }
       setAnalysisResult(result.result || "");
     } catch (error) {
-      setAnalysisError("Failed to connect to local agent.");
+      setAnalysisError("Failed to connect to analysis service.");
     } finally {
       setAnalysisLoading(false);
     }
@@ -564,8 +566,7 @@ export default function App() {
 
   const startDisabled = DEMO_MODE || botActionLoading || botStatus.running || !botStatus.connected;
   const stopDisabled = DEMO_MODE || botActionLoading || !botStatus.running || !botStatus.connected;
-  const analysisDisabled = DEMO_MODE || analysisLoading
-    || !botStatus.connected
+  const analysisDisabled = !CHAIN_ANALYSIS_ENABLED || analysisLoading
     || !analysisForm.departure.trim()
     || !analysisForm.destination.trim()
     || !analysisForm.coin.trim()
@@ -1010,7 +1011,7 @@ export default function App() {
                       <div>
                         <h2 className="font-semibold text-sm text-text-primary">Chain Speed Analysis</h2>
                         <p className="text-[10px] text-text-muted mt-0.5">
-                          {DEMO_MODE ? "Demo mode: backend disabled" : "OpenAI estimate of transfer time"}
+                          {CHAIN_ANALYSIS_ENABLED ? "OpenAI estimate of transfer time" : "Demo mode: backend disabled"}
                         </p>
                       </div>
                     </div>
