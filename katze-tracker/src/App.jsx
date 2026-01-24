@@ -896,7 +896,7 @@ export default function App() {
                           <div key={`${idx}-${line.slice(0, 12)}`} className="break-all">{line}</div>
                         ))
                       ) : (
-                        <div className="text-text-muted">?? ?? ??? ????.</div>
+                        <div className="text-text-muted">No logs yet.</div>
                       )}
                     </div>
                   </div>
