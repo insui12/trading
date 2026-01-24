@@ -66,6 +66,8 @@ const DEFAULT_NETWORK_BY_SYMBOL = {
 };
 const UPBIT_BASE_URL = "https://api.upbit.com/v1";
 const BITGET_BASE_URL = "https://api.bitget.com";
+const PROXY_BASE = "/.netlify/functions/proxy?url=";
+const buildProxyUrl = (url) => `${PROXY_BASE}${encodeURIComponent(url)}`;
 const REFRESH_MS = 10000;
 const DEMO_MODE = true;
 const DEMO_NOTICE = "Demo mode: backend features are disabled.";
@@ -108,7 +110,7 @@ const getDefaultNetworkForSymbol = (symbol) => {
 const getStepMeta = (step) => STEP_META[step] || { label: "대기 중", color: "148,163,184" };
 
 async function fetchUpbitMarketSet() {
-  const response = await fetch(`${UPBIT_BASE_URL}/market/all?isDetails=false`);
+  const response = await fetch(buildProxyUrl(`${UPBIT_BASE_URL}/market/all?isDetails=false`));
   if (!response.ok) throw new Error("Upbit market list error");
   const data = await response.json();
   return new Set(data.map((item) => item.market));
@@ -116,7 +118,7 @@ async function fetchUpbitMarketSet() {
 
 async function fetchUpbitTickers(markets) {
   if (markets.length === 0) return new Map();
-  const response = await fetch(`${UPBIT_BASE_URL}/ticker?markets=${markets.join(",")}`);
+  const response = await fetch(buildProxyUrl(`${UPBIT_BASE_URL}/ticker?markets=${markets.join(",")}`));
   if (!response.ok) throw new Error("Upbit ticker error");
   const data = await response.json();
   const map = new Map();
@@ -151,7 +153,7 @@ function extractBitgetPair(data) {
 }
 
 async function fetchBitgetTickers(url) {
-  const response = await fetch(url);
+  const response = await fetch(buildProxyUrl(url));
   if (!response.ok) throw new Error(`Bitget tickers error (${response.status})`);
   const payload = await response.json();
   return Array.isArray(payload.data) ? payload.data : [];
