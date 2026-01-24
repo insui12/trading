@@ -797,7 +797,7 @@ export default function App() {
                   <img
                     src={HOMEPAGE_LOGO}
                     alt="MATGA homepage logo"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 <div className="flex-[2] w-full relative group overflow-hidden">
