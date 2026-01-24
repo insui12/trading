@@ -67,6 +67,8 @@ const DEFAULT_NETWORK_BY_SYMBOL = {
 const UPBIT_BASE_URL = "https://api.upbit.com/v1";
 const BITGET_BASE_URL = "https://api.bitget.com";
 const REFRESH_MS = 10000;
+const DEMO_MODE = true;
+const DEMO_NOTICE = "Demo mode: backend features are disabled.";
 const LOCAL_API_BASE = "http://127.0.0.1:8000";
 const LOCAL_WS_URL = "ws://127.0.0.1:8000/ws/logs";
 const LOG_LIMIT = 200;
@@ -344,6 +346,12 @@ export default function App() {
   };
 
   const handleChainAnalysis = async () => {
+    if (DEMO_MODE) {
+      setAnalysisError("");
+      setAnalysisResult(DEMO_NOTICE);
+      return;
+    }
+
     setAnalysisError("");
     setAnalysisResult("");
 
@@ -448,6 +456,11 @@ export default function App() {
   };
 
   const handleStart = async () => {
+    if (DEMO_MODE) {
+      setBotError(DEMO_NOTICE);
+      return;
+    }
+
     setBotError("");
     const validationError = validateBotForm();
     if (validationError) {
@@ -500,6 +513,11 @@ export default function App() {
   };
 
   const handleStop = async () => {
+    if (DEMO_MODE) {
+      setBotError(DEMO_NOTICE);
+      return;
+    }
+
     setBotError("");
     setBotActionLoading(true);
     try {
@@ -517,9 +535,9 @@ export default function App() {
     }
   };
 
-  const startDisabled = botActionLoading || botStatus.running || !botStatus.connected;
-  const stopDisabled = botActionLoading || !botStatus.running || !botStatus.connected;
-  const analysisDisabled = analysisLoading
+  const startDisabled = DEMO_MODE || botActionLoading || botStatus.running || !botStatus.connected;
+  const stopDisabled = DEMO_MODE || botActionLoading || !botStatus.running || !botStatus.connected;
+  const analysisDisabled = DEMO_MODE || analysisLoading
     || !botStatus.connected
     || !analysisForm.departure.trim()
     || !analysisForm.destination.trim()
@@ -633,6 +651,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (DEMO_MODE) return undefined;
     let active = true;
 
     const fetchStatus = async () => {
@@ -670,6 +689,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (DEMO_MODE) return undefined;
     let ws;
     let reconnectTimer;
     let active = true;
@@ -904,7 +924,9 @@ export default function App() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h2 className="font-semibold text-sm text-text-primary">Chain Speed Analysis</h2>
-                        <p className="text-[10px] text-text-muted mt-0.5">OpenAI estimate of transfer time</p>
+                        <p className="text-[10px] text-text-muted mt-0.5">
+                          {DEMO_MODE ? "Demo mode: backend disabled" : "OpenAI estimate of transfer time"}
+                        </p>
                       </div>
                     </div>
                     <div className="mt-3 flex flex-col gap-3 text-xs flex-1 min-h-0">
@@ -991,10 +1013,12 @@ export default function App() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h2 className="font-semibold text-sm text-text-primary">Auto Trading Control</h2>
-                        <p className="text-[10px] text-text-muted mt-0.5">Local agent: 127.0.0.1:8000</p>
+                        <p className="text-[10px] text-text-muted mt-0.5">
+                          {DEMO_MODE ? "Demo mode: backend disabled" : "Local agent: 127.0.0.1:8000"}
+                        </p>
                       </div>
-                      <span className={`text-[10px] px-2 py-1 rounded-md border ${botStatus.connected ? 'bg-accent-muted text-accent border-[var(--color-accent)]' : 'bg-bg-tertiary text-text-muted border-border'}`}>
-                        {botStatus.connected ? 'Connected' : 'Offline'}
+                      <span className={`text-[10px] px-2 py-1 rounded-md border ${DEMO_MODE ? 'bg-bg-tertiary text-text-muted border-border' : (botStatus.connected ? 'bg-accent-muted text-accent border-[var(--color-accent)]' : 'bg-bg-tertiary text-text-muted border-border')}`}>
+                        {DEMO_MODE ? 'Demo' : (botStatus.connected ? 'Connected' : 'Offline')}
                       </span>
                     </div>
 
