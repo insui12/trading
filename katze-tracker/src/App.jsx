@@ -258,7 +258,7 @@ const SidebarContent = ({ activeNav, setActiveNav, isDark, setIsDark, setMobileM
 
 // --- 3. 메인 App 컴포넌트 ---
 export default function App() {
-  const [activeNav, setActiveNav] = useState("dashboard");
+  const [activeNav, setActiveNav] = useState("homepage");
   const [isDark, setIsDark] = useState(true);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
