@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import matgaLogoBlack from '../image/matga_logo_black.png';
 import matgaLogoWhite from '../image/matga_logo_white.png';
+import homepageLogo from '../image/homepage_logo.png';
+import homepageImage1 from '../image/image_1.png';
+import homepageImage2 from '../image/image_2.png';
 
 // --- 1. 아이콘 및 데이터 상수 (변경 없음) ---
 const ICONS = {
@@ -13,7 +16,9 @@ const ICONS = {
   chart: <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />,
   bell: <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />,
   community: <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.75-7.5A9.094 9.094 0 0018 3.75m-4.5 14.97a9.11 9.11 0 01-9 0m9 0a9.1 9.1 0 003.75-7.5 9.094 9.094 0 00-3.75-7.5m-9 15a9.1 9.1 0 01-3.75-7.5 9.094 9.094 0 013.75-7.5m9 15v-3.75a3.75 3.75 0 00-3.75-3.75H9a3.75 3.75 0 00-3.75 3.75V18.75m9 0H9m4.5-12a3 3 0 11-6 0 3 3 0 016 0zm7.5 2.25a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />,
-  heatmap: <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+  heatmap: <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />,
+  chevronLeft: <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />,
+  chevronRight: <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5L15.75 12l-7.5 7.5" />
 };
 
 const MENU_ITEMS = [
@@ -86,6 +91,8 @@ const STEP_META = {
   7: { label: "환전", color: "245,158,11" },
   8: { label: "USDT 전송", color: "250,204,21" },
 };
+const HOMEPAGE_LOGO = homepageLogo;
+const HOMEPAGE_SLIDES = [homepageImage1, homepageImage2];
 
 const toNumber = (value) => {
   const num = typeof value === "string" ? Number(value) : value;
@@ -264,6 +271,7 @@ const SidebarContent = ({ activeNav, setActiveNav, isDark, setIsDark, setMobileM
 export default function App() {
   const [activeNav, setActiveNav] = useState("homepage");
   const [isDark, setIsDark] = useState(true);
+  const [homepageSlideIndex, setHomepageSlideIndex] = useState(0);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -313,6 +321,23 @@ export default function App() {
   const logContainerRef = useRef(null);
   const autoScrollEnabledRef = useRef(true);
   const scrollIdleTimerRef = useRef(null);
+  const homepageSlides = HOMEPAGE_SLIDES;
+  const homepageSlideCount = homepageSlides.length;
+  const hasMultipleHomepageSlides = homepageSlideCount > 1;
+
+  const handleHomepagePrev = () => {
+    if (!hasMultipleHomepageSlides) return;
+    setHomepageSlideIndex((prev) => (prev - 1 + homepageSlideCount) % homepageSlideCount);
+  };
+
+  const handleHomepageNext = () => {
+    if (!hasMultipleHomepageSlides) return;
+    setHomepageSlideIndex((prev) => (prev + 1) % homepageSlideCount);
+  };
+
+  const handleHomepageDot = (index) => {
+    setHomepageSlideIndex(index);
+  };
 
   const updateBotForm = (field) => (event) => {
     const { value } = event.target;
@@ -789,7 +814,65 @@ export default function App() {
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {activeNav === 'homepage' ? (
             <div className="flex h-full w-full">
-              <div className="flex-1 rounded-2xl border border-dashed border-border bg-bg-card/60"></div>
+              <div className="flex-1 h-full rounded-2xl border border-border bg-bg-card/60 overflow-hidden flex flex-col">
+                <div className="flex-[1] w-full">
+                  <img
+                    src={HOMEPAGE_LOGO}
+                    alt="MATGA homepage logo"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-[2] w-full relative group overflow-hidden">
+                  <img
+                    src={homepageSlides[homepageSlideIndex]}
+                    alt={`Homepage slide ${homepageSlideIndex + 1}`}
+                    className="w-full h-full object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleHomepagePrev}
+                    disabled={!hasMultipleHomepageSlides}
+                    className={`absolute left-4 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white/80 backdrop-blur-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                      hasMultipleHomepageSlides
+                        ? "opacity-40 group-hover:opacity-90 hover:opacity-100 hover:scale-105"
+                        : "opacity-15 cursor-default"
+                    }`}
+                    aria-label="Previous slide"
+                  >
+                    <SvgIcon name="chevronLeft" className="h-6 w-6" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleHomepageNext}
+                    disabled={!hasMultipleHomepageSlides}
+                    className={`absolute right-4 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white/80 backdrop-blur-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                      hasMultipleHomepageSlides
+                        ? "opacity-40 group-hover:opacity-90 hover:opacity-100 hover:scale-105"
+                        : "opacity-15 cursor-default"
+                    }`}
+                    aria-label="Next slide"
+                  >
+                    <SvgIcon name="chevronRight" className="h-6 w-6" />
+                  </button>
+                  {homepageSlideCount > 0 && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-full bg-black/35 px-3 py-1.5 backdrop-blur-sm">
+                      {homepageSlides.map((_, index) => (
+                        <button
+                          key={`slide-dot-${index}`}
+                          type="button"
+                          onClick={() => handleHomepageDot(index)}
+                          className={`h-2.5 w-2.5 rounded-full transition-all ${
+                            index === homepageSlideIndex
+                              ? "bg-accent shadow-[0_0_6px_var(--color-accent)]"
+                              : "bg-white/30 hover:bg-white/70"
+                          }`}
+                          aria-label={`Go to slide ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           ) : activeNav === 'dashboard' ? (
             <div className="flex flex-col gap-4 max-w-[1600px] mx-auto pb-10 h-full">
